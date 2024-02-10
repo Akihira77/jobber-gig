@@ -36,7 +36,7 @@ describe("Gig controller", () => {
 
             jest.spyOn(gigCreateSchema, "validate").mockImplementation(
                 (): any => {
-                    Promise.resolve({
+                    return Promise.resolve({
                         error: {
                             name: "ValidationError",
                             isJoi: true,
@@ -64,14 +64,14 @@ describe("Gig controller", () => {
 
             jest.spyOn(gigCreateSchema, "validate").mockImplementation(
                 (): any => {
-                    Promise.resolve({
+                    return Promise.resolve({
                         error: {}
                     });
                 }
             );
 
             jest.spyOn(helper, "uploads").mockImplementation((): any => {
-                Promise.resolve({
+                return Promise.resolve({
                     public_id: ""
                 });
             });
@@ -93,14 +93,14 @@ describe("Gig controller", () => {
 
             jest.spyOn(gigCreateSchema, "validate").mockImplementation(
                 (): any => {
-                    Promise.resolve({
+                    return Promise.resolve({
                         error: {}
                     });
                 }
             );
 
             jest.spyOn(helper, "uploads").mockImplementation((): any => {
-                Promise.resolve({
+                return Promise.resolve({
                     public_id: "123456"
                 });
             });
