@@ -10,7 +10,12 @@ import {
     winstonLogger
 } from "@Akihira77/jobber-shared";
 import { Logger } from "winston";
-import { API_GATEWAY_URL, ELASTIC_SEARCH_URL, JWT_TOKEN } from "@gig/config";
+import {
+    API_GATEWAY_URL,
+    ELASTIC_SEARCH_URL,
+    JWT_TOKEN,
+    PORT
+} from "@gig/config";
 import {
     Application,
     NextFunction,
@@ -31,7 +36,6 @@ import {
     consumeSeedDirectMessages
 } from "@gig/queues/gig.consumer";
 
-const PORT = 4004;
 export let gigChannel: Channel;
 
 const log: Logger = winstonLogger(
@@ -117,7 +121,7 @@ function startServer(app: Application): void {
     try {
         const httpServer: http.Server = new http.Server(app);
         log.info(`Gig server has started with pid ${process.pid}`);
-        httpServer.listen(PORT, () => {
+        httpServer.listen(Number(PORT), () => {
             log.info(`Gig server running on port ${PORT}`);
         });
     } catch (error) {
