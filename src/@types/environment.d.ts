@@ -18,6 +18,7 @@ declare global {
             ELASTIC_SEARCH_URL: string;
             ELASTIC_APM_SERVER_URL: string;
             ELASTIC_APM_SECRET_TOKEN: string;
+            ELASTIC_APM_SERVICE_NAME: string;
         }
     }
 }
