@@ -15,7 +15,6 @@ import {
 import { GigModel } from "@gig/models/gig.model";
 import { publishDirectMessage } from "@gig/queues/gig.producer";
 import { gigChannel } from "@gig/server";
-import { gigsSearchBySellerId } from "@gig/services/search.service";
 import { sample } from "lodash";
 
 export async function getGigById(id: string): Promise<ISellerGig> {
@@ -27,27 +26,47 @@ export async function getGigById(id: string): Promise<ISellerGig> {
 export async function getSellerActiveGigs(
     sellerId: string
 ): Promise<ISellerGig[]> {
-    const resultHits: ISellerGig[] = [];
-    const gigs = await gigsSearchBySellerId(sellerId, true);
+    // const resultHits: ISellerGig[] = [];
+    // const gigs = await gigsSearchBySellerId(sellerId, true);
 
-    for (const item of gigs.hits) {
-        resultHits.push(item._source as ISellerGig);
-    }
+    // for (const item of gigs.hits) {
+    //     resultHits.push(item._source as ISellerGig);
+    // }
 
-    return resultHits;
+    // return resultHits;
+
+    const results: ISellerGig[] = [];
+    const gigs: ISellerGig[] = await GigModel.find({sellerId, active: true});
+
+    gigs.forEach(gig => {
+        const gigOmit_Id = gig.toJSON?.() as ISellerGig;
+        results.push(gigOmit_Id);
+    });
+
+    return results;
 }
 
 export async function getSellerInactiveGigs(
     sellerId: string
 ): Promise<ISellerGig[]> {
-    const resultHits: ISellerGig[] = [];
-    const gigs = await gigsSearchBySellerId(sellerId, false);
+    // const resultHits: ISellerGig[] = [];
+    // const gigs = await gigsSearchBySellerId(sellerId, false);
 
-    for (const item of gigs.hits) {
-        resultHits.push(item._source as ISellerGig);
-    }
+    // for (const item of gigs.hits) {
+    //     resultHits.push(item._source as ISellerGig);
+    // }
 
-    return resultHits;
+    // return resultHits;
+
+    const results: ISellerGig[] = [];
+    const gigs: ISellerGig[] = await GigModel.find({sellerId, active: false});
+
+    gigs.forEach(gig => {
+        const gigOmit_Id = gig.toJSON?.() as ISellerGig;
+        results.push(gigOmit_Id);
+    });
+
+    return results;
 }
 
 export async function createGig(request: ISellerGig): Promise<ISellerGig> {
@@ -68,7 +87,7 @@ export async function createGig(request: ISellerGig): Promise<ISellerGig> {
             }),
             "Details sent to users service"
         );
-        await addDataToIndex("gigs", `${createdGig._id}`, gigOmit_Id);
+        await addDataToIndex("gigs", createdGig._id.toString(), gigOmit_Id);
     }
 
     return createdGig;
@@ -93,7 +112,7 @@ export async function deleteGig(
         }),
         "Details sent to users service"
     );
-    await deleteIndexedData("gigs", `${gigId}`);
+    await deleteIndexedData("gigs", gigId);
 }
 
 export async function updateGig(
@@ -123,7 +142,7 @@ export async function updateGig(
 
     if (updatedGig) {
         const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig;
-        await updateIndexedData("gigs", `${updatedGig._id}`, gigOmit_Id);
+        await updateIndexedData("gigs", updatedGig._id!.toString(), gigOmit_Id);
     }
 
     return updatedGig;
@@ -147,7 +166,7 @@ export async function updateActiveGigProp(
 
     if (updatedGig) {
         const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig;
-        await updateIndexedData("gigs", `${updatedGig._id}`, gigOmit_Id);
+        await updateIndexedData("gigs", gigOmit_Id.id!.toString(), gigOmit_Id);
     }
 
     return updatedGig;
@@ -180,7 +199,7 @@ export async function updateGigReview(
 
     if (updatedGig) {
         const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig;
-        await updateIndexedData("gigs", `${updatedGig._id}`, gigOmit_Id);
+        await updateIndexedData("gigs", updatedGig._id!.toString(), gigOmit_Id);
     }
 }
 
@@ -193,7 +212,7 @@ export async function seedData(
         "Digital Marketing",
         "Writing & Translation",
         "Video & Animation",
-        "Music & Video",
+        "Music & Audio",
         "Programming & Tech",
         "Data",
         "Business"

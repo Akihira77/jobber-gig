@@ -20,8 +20,8 @@ export function gigRoutes(): Router {
     router.post("/create", create.gig);
 
     router.put("/seed/:count", seed.gigs);
-    router.put("/:gigId", update.gig);
-    router.put("/active/:gigId", update.gigUpdateActiveStatus);
+    router.put("/update/:gigId", update.gig);
+    router.put("/status/:gigId", update.gigUpdateActiveStatus);
 
     router.delete("/:gigId/:sellerId", remove.gig);
 

@@ -24,7 +24,6 @@ export async function gig(req: Request, res: Response): Promise<void> {
             "Create gig() method"
         );
     }
-
     const documentCount = await getDocumentCount("gigs");
 
     const gigData: ISellerGig = {

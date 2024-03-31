@@ -15,13 +15,13 @@ export async function getUserSelectedGigCategory(key: string): Promise<string> {
             await client.connect();
         }
 
-        const response = (await client.GET(key)) as string;
+        const response = (await client.GET(key)) ?? "";
 
         return response;
     } catch (error) {
         log.error(
             "GigService GigCache getUserSelectedGigCategory() method error:",
-            error
+            (error as Error).message
         );
         return "";
     }
