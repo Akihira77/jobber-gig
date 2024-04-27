@@ -4,7 +4,7 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "start:dev": "nodemon -r tsconfig-paths/register src/app.ts | pino-pretty -c",
+    "start:dev": "set NODE_ENV=development&&nodemon -r tsconfig-paths/register src/app.ts | pino-pretty -c",
     "start": "pm2 start ./build/src/app.js -i 5 --attach --watch | pino-pretty -c",
     "stop": "pm2 stop all",
     "delete": "pm2 delete all",

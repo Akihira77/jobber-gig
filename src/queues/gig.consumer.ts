@@ -37,7 +37,7 @@ export async function consumeGigDirectMessages(
             gigService.updateGig.routingKey
         );
 
-        channel.consume(
+        await channel.consume(
             jobberQueue.queue,
             async (message: ConsumeMessage | null) => {
                 const { gigReview } = JSON.parse(message!.content.toString());
@@ -74,7 +74,7 @@ export async function consumeSeedDirectMessages(
             gigService.seed.routingKey
         );
 
-        channel.consume(
+        await channel.consume(
             jobberQueue.queue,
             async (message: ConsumeMessage | null) => {
                 const { sellers, count } = JSON.parse(

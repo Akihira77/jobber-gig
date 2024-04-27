@@ -1,11 +1,13 @@
 import {
+    BadRequestError,
     IRatingTypes,
     IReviewMessageDetails,
     ISellerDocument,
-    ISellerGig
+    ISellerGig,
+    winstonLogger
 } from "@Akihira77/jobber-shared";
 import { faker } from "@faker-js/faker";
-import { exchangeNamesAndRoutingKeys } from "@gig/config";
+import { ELASTIC_SEARCH_URL, exchangeNamesAndRoutingKeys } from "@gig/config";
 import {
     addDataToIndex,
     deleteIndexedData,
@@ -16,6 +18,10 @@ import { GigModel } from "@gig/models/gig.model";
 import { publishDirectMessage } from "@gig/queues/gig.producer";
 import { gigChannel } from "@gig/server";
 import { sample } from "lodash";
+import cloudinary from "cloudinary"
+import { Logger } from "winston";
+
+const logger: Logger = winstonLogger(`${ELASTIC_SEARCH_URL}`, "gigService", "debug");
 
 export async function getGigById(id: string): Promise<ISellerGig> {
     const gig = await getIndexedData("gigs", id);
@@ -26,93 +32,113 @@ export async function getGigById(id: string): Promise<ISellerGig> {
 export async function getSellerActiveGigs(
     sellerId: string
 ): Promise<ISellerGig[]> {
-    // const resultHits: ISellerGig[] = [];
-    // const gigs = await gigsSearchBySellerId(sellerId, true);
+    try {
+        const results: ISellerGig[] = [];
+        const gigs: ISellerGig[] = await GigModel.find({ sellerId, active: true });
 
-    // for (const item of gigs.hits) {
-    //     resultHits.push(item._source as ISellerGig);
-    // }
+        gigs.forEach(gig => {
+            const gigOmit_Id = gig.toJSON?.() as ISellerGig;
+            results.push(gigOmit_Id);
+        });
 
-    // return resultHits;
-
-    const results: ISellerGig[] = [];
-    const gigs: ISellerGig[] = await GigModel.find({sellerId, active: true});
-
-    gigs.forEach(gig => {
-        const gigOmit_Id = gig.toJSON?.() as ISellerGig;
-        results.push(gigOmit_Id);
-    });
-
-    return results;
+        return results;
+    } catch (error) {
+        logger.error("GigService getSellerActiveGigs() method error", error)
+        throw error
+    }
 }
 
 export async function getSellerInactiveGigs(
     sellerId: string
 ): Promise<ISellerGig[]> {
-    // const resultHits: ISellerGig[] = [];
-    // const gigs = await gigsSearchBySellerId(sellerId, false);
+    try {
+        const results: ISellerGig[] = [];
+        const gigs: ISellerGig[] = await GigModel.find({ sellerId, active: false });
 
-    // for (const item of gigs.hits) {
-    //     resultHits.push(item._source as ISellerGig);
-    // }
+        gigs.forEach(gig => {
+            const gigOmit_Id = gig.toJSON?.() as ISellerGig;
+            results.push(gigOmit_Id);
+        });
 
-    // return resultHits;
-
-    const results: ISellerGig[] = [];
-    const gigs: ISellerGig[] = await GigModel.find({sellerId, active: false});
-
-    gigs.forEach(gig => {
-        const gigOmit_Id = gig.toJSON?.() as ISellerGig;
-        results.push(gigOmit_Id);
-    });
-
-    return results;
+        return results;
+    } catch (error) {
+        logger.error("GigService getSellerInactiveGigs() method error", error)
+        throw error
+    }
 }
 
 export async function createGig(request: ISellerGig): Promise<ISellerGig> {
-    const createdGig = await GigModel.create(request);
+    try {
+        const createdGig = await GigModel.create(request);
 
-    if (createdGig) {
-        const gigOmit_Id = createdGig.toJSON?.() as ISellerGig;
-        const { buyerService } = exchangeNamesAndRoutingKeys;
+        if (createdGig) {
+            const gigOmit_Id = createdGig.toJSON?.() as ISellerGig;
+            const { usersService } = exchangeNamesAndRoutingKeys;
 
-        await publishDirectMessage(
-            gigChannel,
-            buyerService.seller.exchangeName,
-            buyerService.seller.routingKey,
-            JSON.stringify({
-                type: "update-gig-count",
-                gigSellerId: `${gigOmit_Id.sellerId}`,
-                count: 1
-            }),
-            "Details sent to users service"
-        );
-        await addDataToIndex("gigs", createdGig._id.toString(), gigOmit_Id);
+            await publishDirectMessage(
+                gigChannel,
+                usersService.seller.exchangeName,
+                usersService.seller.routingKey,
+                JSON.stringify({
+                    type: "update-gig-count",
+                    gigSellerId: `${gigOmit_Id.sellerId}`,
+                    count: 1
+                }),
+                "Details sent to users service"
+            );
+            await addDataToIndex("gigs", createdGig._id.toString(), gigOmit_Id);
+        }
+
+        return createdGig;
+    } catch (error) {
+        logger.error("GigService createGig() method error", error);
+        throw error
     }
-
-    return createdGig;
 }
 
 export async function deleteGig(
     gigId: string,
     sellerId: string
 ): Promise<void> {
-    await GigModel.deleteOne({ _id: gigId }).exec();
+    try {
+        const result = await GigModel.findOneAndDelete({ _id: gigId }).lean().exec();
 
-    const { buyerService } = exchangeNamesAndRoutingKeys;
+        if (!result) {
+            throw new BadRequestError("Gig is not found", "GigService deleteGig() method")
+        }
 
-    await publishDirectMessage(
-        gigChannel,
-        buyerService.seller.exchangeName,
-        buyerService.seller.routingKey,
-        JSON.stringify({
-            type: "update-gig-count",
-            gigSellerId: sellerId,
-            count: -1
-        }),
-        "Details sent to users service"
-    );
-    await deleteIndexedData("gigs", gigId);
+        if (result.coverImage.includes("res.cloudinary.com")) {
+            const textPerPath = result.coverImage.split("/")
+            const fileName = textPerPath[textPerPath.length - 1]
+            const public_id = fileName.slice(0, fileName.indexOf("."))
+
+            cloudinary.v2.uploader.destroy(public_id, {
+                resource_type: "image"
+            })
+        }
+
+        const { usersService } = exchangeNamesAndRoutingKeys;
+
+        await publishDirectMessage(
+            gigChannel,
+            usersService.seller.exchangeName,
+            usersService.seller.routingKey,
+            JSON.stringify({
+                type: "update-gig-count",
+                gigSellerId: sellerId,
+                count: -1
+            }),
+            "Details sent to users service"
+        );
+        await deleteIndexedData("gigs", gigId);
+    } catch (error) {
+        if (error) {
+            logger.error("GigService deleteGig() method error", error)
+            throw error
+        }
+
+        throw new Error("Unexpected error occured. Please try again.")
+    }
 }
 
 export async function updateGig(

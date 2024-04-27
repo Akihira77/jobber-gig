@@ -11,7 +11,7 @@ import { updateActiveGigProp, updateGig } from "@gig/services/gig.service";
 import { StatusCodes } from "http-status-codes";
 
 export async function gig(req: Request, res: Response): Promise<void> {
-    const { error } = await Promise.resolve(gigUpdateSchema.validate(req.body));
+    const { error } = gigUpdateSchema.validate(req.body);
 
     if (error?.details) {
         throw new BadRequestError(
@@ -31,7 +31,7 @@ export async function gig(req: Request, res: Response): Promise<void> {
             req.body.coverImage
         )) as UploadApiResponse;
 
-        if (!result.public_id) {
+        if (!result?.public_id) {
             throw new BadRequestError(
                 "File upload error. Try again.",
                 "Update gig() method"

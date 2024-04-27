@@ -36,7 +36,6 @@ export async function gigsSearchBySellerId(
     ];
 
     try {
-        console.log(queryList);
         const result: SearchResponse = await elasticSearchClient.search({
             index: "gigs",
             query: {
@@ -97,8 +96,6 @@ export async function gigsSearch(
         });
     }
 
-    console.log(`min ${min}`);
-    console.log(`max ${max}`);
     if (min !== "undefined" && max !== "undefined") {
         queryList.push({
             range: {
@@ -109,10 +106,6 @@ export async function gigsSearch(
             }
         });
     }
-
-    queryList.forEach((query) => {
-        console.log({ ...query });
-    });
 
     try {
         const result: SearchResponse = await elasticSearchClient.search({

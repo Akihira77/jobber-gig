@@ -95,7 +95,7 @@ export async function getIndexedData(
 export async function addDataToIndex(
     index: string,
     itemId: string,
-    document: unknown
+    document: ISellerGig
 ): Promise<void> {
     try {
         await elasticSearchClient.index({ index, id: itemId, document });

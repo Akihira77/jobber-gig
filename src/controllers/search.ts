@@ -22,7 +22,6 @@ export async function gigsQuerySearch(
     const { query, delivery_time, minprice, minPrice, maxprice, maxPrice } =
         req.query;
 
-    console.log(req.query);
     const gigs: ISearchResult = await gigsSearch(
         String(query),
         paginate,

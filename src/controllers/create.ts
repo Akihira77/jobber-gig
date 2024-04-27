@@ -7,7 +7,7 @@ import { StatusCodes } from "http-status-codes";
 import { getDocumentCount } from "@gig/elasticsearch";
 
 export async function gig(req: Request, res: Response): Promise<void> {
-    const { error } = await Promise.resolve(gigCreateSchema.validate(req.body));
+    const { error } = gigCreateSchema.validate(req.body);
 
     if (error?.details) {
         throw new BadRequestError(
@@ -18,7 +18,7 @@ export async function gig(req: Request, res: Response): Promise<void> {
 
     const result = (await uploads(req.body.coverImage)) as UploadApiResponse;
 
-    if (!result.public_id) {
+    if (!result?.public_id) {
         throw new BadRequestError(
             "File upload error. Try again.",
             "Create gig() method"

@@ -57,7 +57,7 @@ export const exchangeNamesAndRoutingKeys = {
             routingKey: "order-email"
         }
     },
-    buyerService: {
+    usersService: {
         buyer: {
             exchangeName: "jobber-buyer-update",
             routingKey: "user-buyer"
