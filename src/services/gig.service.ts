@@ -18,10 +18,14 @@ import { GigModel } from "@gig/models/gig.model";
 import { publishDirectMessage } from "@gig/queues/gig.producer";
 import { gigChannel } from "@gig/server";
 import { sample } from "lodash";
-import cloudinary from "cloudinary"
+import cloudinary from "cloudinary";
 import { Logger } from "winston";
 
-const logger: Logger = winstonLogger(`${ELASTIC_SEARCH_URL}`, "gigService", "debug");
+const logger: Logger = winstonLogger(
+    `${ELASTIC_SEARCH_URL}`,
+    "gigService",
+    "debug"
+);
 
 export async function getGigById(id: string): Promise<ISellerGig> {
     const gig = await getIndexedData("gigs", id);
@@ -34,17 +38,22 @@ export async function getSellerActiveGigs(
 ): Promise<ISellerGig[]> {
     try {
         const results: ISellerGig[] = [];
-        const gigs: ISellerGig[] = await GigModel.find({ sellerId, active: true });
+        const gigs: ISellerGig[] = await GigModel.find({
+            sellerId,
+            active: true
+        })
+            .lean()
+            .exec();
 
-        gigs.forEach(gig => {
+        gigs.forEach((gig) => {
             const gigOmit_Id = gig.toJSON?.() as ISellerGig;
             results.push(gigOmit_Id);
         });
 
         return results;
     } catch (error) {
-        logger.error("GigService getSellerActiveGigs() method error", error)
-        throw error
+        logger.error("GigService getSellerActiveGigs() method error", error);
+        throw error;
     }
 }
 
@@ -53,17 +62,22 @@ export async function getSellerInactiveGigs(
 ): Promise<ISellerGig[]> {
     try {
         const results: ISellerGig[] = [];
-        const gigs: ISellerGig[] = await GigModel.find({ sellerId, active: false });
+        const gigs: ISellerGig[] = await GigModel.find({
+            sellerId,
+            active: false
+        })
+            .lean()
+            .exec();
 
-        gigs.forEach(gig => {
+        gigs.forEach((gig) => {
             const gigOmit_Id = gig.toJSON?.() as ISellerGig;
             results.push(gigOmit_Id);
         });
 
         return results;
     } catch (error) {
-        logger.error("GigService getSellerInactiveGigs() method error", error)
-        throw error
+        logger.error("GigService getSellerInactiveGigs() method error", error);
+        throw error;
     }
 }
 
@@ -92,7 +106,7 @@ export async function createGig(request: ISellerGig): Promise<ISellerGig> {
         return createdGig;
     } catch (error) {
         logger.error("GigService createGig() method error", error);
-        throw error
+        throw error;
     }
 }
 
@@ -101,20 +115,25 @@ export async function deleteGig(
     sellerId: string
 ): Promise<void> {
     try {
-        const result = await GigModel.findOneAndDelete({ _id: gigId }).lean().exec();
+        const result = await GigModel.findOneAndDelete({ _id: gigId })
+            .lean()
+            .exec();
 
         if (!result) {
-            throw new BadRequestError("Gig is not found", "GigService deleteGig() method")
+            throw new BadRequestError(
+                "Gig is not found",
+                "GigService deleteGig() method"
+            );
         }
 
         if (result.coverImage.includes("res.cloudinary.com")) {
-            const textPerPath = result.coverImage.split("/")
-            const fileName = textPerPath[textPerPath.length - 1]
-            const public_id = fileName.slice(0, fileName.indexOf("."))
+            const textPerPath = result.coverImage.split("/");
+            const fileName = textPerPath[textPerPath.length - 1];
+            const public_id = fileName.slice(0, fileName.indexOf("."));
 
             cloudinary.v2.uploader.destroy(public_id, {
                 resource_type: "image"
-            })
+            });
         }
 
         const { usersService } = exchangeNamesAndRoutingKeys;
@@ -133,11 +152,11 @@ export async function deleteGig(
         await deleteIndexedData("gigs", gigId);
     } catch (error) {
         if (error) {
-            logger.error("GigService deleteGig() method error", error)
-            throw error
+            logger.error("GigService deleteGig() method error", error);
+            throw error;
         }
 
-        throw new Error("Unexpected error occured. Please try again.")
+        throw new Error("Unexpected error occured. Please try again.");
     }
 }
 
@@ -164,7 +183,7 @@ export async function updateGig(
         {
             new: true
         }
-    ).exec()) as ISellerGig;
+    ).lean().exec()) as ISellerGig;
 
     if (updatedGig) {
         const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig;
@@ -188,7 +207,7 @@ export async function updateActiveGigProp(
         {
             new: true
         }
-    ).exec()) as ISellerGig;
+    ).lean().exec()) as ISellerGig;
 
     if (updatedGig) {
         const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig;
@@ -221,7 +240,7 @@ export async function updateGigReview(
             }
         },
         { new: true, upsert: true }
-    ).exec()) as ISellerGig;
+    ).lean().exec()) as ISellerGig;
 
     if (updatedGig) {
         const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig;

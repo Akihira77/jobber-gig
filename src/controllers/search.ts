@@ -19,15 +19,15 @@ export async function gigsQuerySearch(
         size: parseInt(`${size}`),
         type
     };
-    const { query, delivery_time, minprice, minPrice, maxprice, maxPrice } =
+    const { query, delivery_time, minprice, minPrice, maxprice, maxPrice, min, max } =
         req.query;
 
     const gigs: ISearchResult = await gigsSearch(
         String(query),
         paginate,
         String(delivery_time),
-        String(minprice || minPrice),
-        String(maxprice || maxPrice)
+        String(minprice || minPrice || min),
+        String(maxprice || maxPrice || max)
     );
 
     for (const item of gigs.hits) {

@@ -40,9 +40,12 @@ export async function consumeGigDirectMessages(
         await channel.consume(
             jobberQueue.queue,
             async (message: ConsumeMessage | null) => {
-                const { gigReview } = JSON.parse(message!.content.toString());
+                const { type } = JSON.parse(message!.content.toString());
 
-                await updateGigReview(JSON.parse(gigReview));
+                if (type === "updateGigReview") {
+                    const { gigReview } = JSON.parse(message!.content.toString());
+                    await updateGigReview(gigReview);
+                }
                 channel.ack(message!);
             }
         );
