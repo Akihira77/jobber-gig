@@ -1,9 +1,11 @@
 import {
     BadRequestError,
+    CustomError,
     IRatingTypes,
     IReviewMessageDetails,
     ISellerDocument,
     ISellerGig,
+    NotFoundError,
     winstonLogger
 } from "@Akihira77/jobber-shared";
 import { faker } from "@faker-js/faker";
@@ -20,6 +22,7 @@ import { gigChannel } from "@gig/server";
 import { sample } from "lodash";
 import cloudinary from "cloudinary";
 import { Logger } from "winston";
+import { isValidObjectId } from "mongoose";
 
 const logger: Logger = winstonLogger(
     `${ELASTIC_SEARCH_URL}`,
@@ -42,7 +45,6 @@ export async function getSellerActiveGigs(
             sellerId,
             active: true
         })
-            .lean()
             .exec();
 
         gigs.forEach((gig) => {
@@ -53,7 +55,7 @@ export async function getSellerActiveGigs(
         return results;
     } catch (error) {
         logger.error("GigService getSellerActiveGigs() method error", error);
-        throw error;
+        throw new Error("Unexpected error occured. Please try again.")
     }
 }
 
@@ -66,7 +68,6 @@ export async function getSellerInactiveGigs(
             sellerId,
             active: false
         })
-            .lean()
             .exec();
 
         gigs.forEach((gig) => {
@@ -77,12 +78,18 @@ export async function getSellerInactiveGigs(
         return results;
     } catch (error) {
         logger.error("GigService getSellerInactiveGigs() method error", error);
-        throw error;
+        throw new Error("Unexpected error occured. Please try again.")
     }
 }
 
 export async function createGig(request: ISellerGig): Promise<ISellerGig> {
     try {
+        const { expectedDelivery } = request;
+        if (!(expectedDelivery.includes("Day Delivery") || expectedDelivery.includes("Days Delivery"))
+        ) {
+            throw new BadRequestError("Error expected delivery field is incorrect value", "GigService createGig() method")
+        }
+
         const createdGig = await GigModel.create(request);
 
         if (createdGig) {
@@ -106,7 +113,11 @@ export async function createGig(request: ISellerGig): Promise<ISellerGig> {
         return createdGig;
     } catch (error) {
         logger.error("GigService createGig() method error", error);
-        throw error;
+        if (error instanceof CustomError) {
+            throw error
+        }
+
+        throw new Error("Unexpected error occured. Please try again.")
     }
 }
 
@@ -115,12 +126,19 @@ export async function deleteGig(
     sellerId: string
 ): Promise<void> {
     try {
-        const result = await GigModel.findOneAndDelete({ _id: gigId })
+        if (!isValidObjectId(gigId)) {
+            throw new BadRequestError(
+                "Invalid gig id",
+                "GigService deleteGig() method"
+            );
+        }
+
+        const result = await GigModel.findOneAndDelete({ _id: gigId, sellerId })
             .lean()
             .exec();
 
         if (!result) {
-            throw new BadRequestError(
+            throw new NotFoundError(
                 "Gig is not found",
                 "GigService deleteGig() method"
             );
@@ -151,9 +169,10 @@ export async function deleteGig(
         );
         await deleteIndexedData("gigs", gigId);
     } catch (error) {
-        if (error) {
-            logger.error("GigService deleteGig() method error", error);
-            throw error;
+        logger.error("GigService deleteGig() method error", error);
+
+        if (error instanceof CustomError) {
+            throw error
         }
 
         throw new Error("Unexpected error occured. Please try again.");
@@ -163,88 +182,127 @@ export async function deleteGig(
 export async function updateGig(
     gigId: string,
     gigData: ISellerGig
-): Promise<ISellerGig> {
-    const updatedGig = (await GigModel.findOneAndUpdate(
-        { _id: gigId },
-        {
-            $set: {
-                title: gigData.title,
-                description: gigData.description,
-                categories: gigData.categories,
-                subCategories: gigData.subCategories,
-                tags: gigData.tags,
-                price: gigData.price,
-                coverImage: gigData.coverImage,
-                expectedDelivery: gigData.expectedDelivery,
-                basicTitle: gigData.basicTitle,
-                basicDescription: gigData.basicDescription
-            }
-        },
-        {
-            new: true
+): Promise<ISellerGig | null> {
+    try {
+        if (!isValidObjectId(gigId)) {
+            throw new BadRequestError("Invalid gig id", "GigService updateGig() method")
         }
-    ).lean().exec()) as ISellerGig;
 
-    if (updatedGig) {
-        const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig;
-        await updateIndexedData("gigs", updatedGig._id!.toString(), gigOmit_Id);
+        const updatedGig = (await GigModel.findOneAndUpdate(
+            { _id: gigId, sellerId: gigData.sellerId },
+            {
+                $set: {
+                    title: gigData.title,
+                    description: gigData.description,
+                    categories: gigData.categories,
+                    subCategories: gigData.subCategories,
+                    tags: gigData.tags,
+                    price: gigData.price,
+                    coverImage: gigData.coverImage,
+                    expectedDelivery: gigData.expectedDelivery,
+                    basicTitle: gigData.basicTitle,
+                    basicDescription: gigData.basicDescription
+                }
+            },
+            {
+                new: true
+            }
+        ).exec());
+
+        if (updatedGig) {
+            const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig;
+            await updateIndexedData("gigs", updatedGig._id!.toString(), gigOmit_Id);
+        }
+
+        return updatedGig;
+    } catch (error) {
+        logger.error("GigService updateGig() method error", error)
+        if (error instanceof CustomError) {
+            throw error
+        }
+
+        throw new Error("Unexpected error occured. Please try again.")
     }
-
-    return updatedGig;
 }
 
 export async function updateActiveGigProp(
     gigId: string,
     active: boolean
-): Promise<ISellerGig> {
-    const updatedGig = (await GigModel.findOneAndUpdate(
-        { _id: gigId },
-        {
-            $set: {
-                active
-            }
-        },
-        {
-            new: true
+): Promise<ISellerGig | null> {
+    try {
+        if (!isValidObjectId(gigId)) {
+            throw new BadRequestError("Invalid gig id", "GigService updateActiveGigProp() method")
         }
-    ).lean().exec()) as ISellerGig;
 
-    if (updatedGig) {
-        const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig;
-        await updateIndexedData("gigs", gigOmit_Id.id!.toString(), gigOmit_Id);
+        const updatedGig = (await GigModel.findOneAndUpdate(
+            { _id: gigId },
+            {
+                $set: {
+                    active
+                }
+            },
+            {
+                new: true,
+            }
+        ).exec());
+
+        if (updatedGig) {
+            const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig;
+            await updateIndexedData("gigs", gigOmit_Id.id!.toString(), gigOmit_Id);
+        }
+
+        return updatedGig;
+    } catch (error) {
+        logger.error("GigService updateActiveGigProp() method error", error)
+        if (error instanceof CustomError) {
+            throw error
+        }
+
+        throw new Error("Unexpected error occured. Please try again.")
     }
-
-    return updatedGig;
 }
 
 export async function updateGigReview(
     request: IReviewMessageDetails
 ): Promise<void> {
-    const ratingTypes: IRatingTypes = {
-        "1": "one",
-        "2": "two",
-        "3": "three",
-        "4": "four",
-        "5": "five"
-    };
-    const ratingKey: string = ratingTypes[`${request.rating}`];
+    try {
+        if (!isValidObjectId(request.gigId)) {
+            throw new BadRequestError("Invalid gig id", "GigService updateGigReview() method")
+        }
 
-    const updatedGig = (await GigModel.findOneAndUpdate(
-        { _id: request.gigId },
-        {
-            $inc: {
-                ratingsCount: 1, // sum of user rating
-                ratingSum: request.rating, // sum of star
-                [`ratingCategories.${ratingKey}.value`]: request.rating,
-                [`ratingCategories.${ratingKey}.count`]: 1
-            }
-        },
-        { new: true, upsert: true }
-    ).lean().exec()) as ISellerGig;
+        const ratingTypes: IRatingTypes = {
+            "1": "one",
+            "2": "two",
+            "3": "three",
+            "4": "four",
+            "5": "five"
+        };
+        const ratingKey: string = ratingTypes[`${request.rating}`];
 
-    if (updatedGig) {
-        const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig;
-        await updateIndexedData("gigs", updatedGig._id!.toString(), gigOmit_Id);
+        const updatedGig = (await GigModel.findOneAndUpdate(
+            { _id: request.gigId, sellerId: request.sellerId },
+            {
+                $inc: {
+                    ratingsCount: 1, // sum of user rating
+                    ratingSum: request.rating, // sum of star
+                    [`ratingCategories.${ratingKey}.value`]: request.rating,
+                    [`ratingCategories.${ratingKey}.count`]: 1
+                }
+            },
+            { new: true, upsert: true }
+        ).exec());
+
+        if (updatedGig) {
+            const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig;
+            await updateIndexedData("gigs", updatedGig._id!.toString(), gigOmit_Id);
+        }
+    } catch (error) {
+        logger.error("GigService updateGigReview() method error", error)
+        if (error instanceof CustomError) {
+            throw error
+        }
+
+        throw new Error("Unexpected error occured. Please try again.")
     }
 }
 
@@ -265,10 +323,10 @@ export async function seedData(
 
     const expectedDeliveries: string[] = [
         "1 Day Delivery",
-        "2 Day Delivery",
-        "3 Day Delivery",
-        "4 Day Delivery",
-        "5 Day Delivery"
+        "2 Days Delivery",
+        "3 Days Delivery",
+        "4 Days Delivery",
+        "5 Days Delivery"
     ];
 
     const randomRatings = [

@@ -94,7 +94,7 @@ async function startQueues(): Promise<void> {
     await consumeSeedDirectMessages(gigChannel);
 }
 
-function startElasticSearch(): void {
+export function startElasticSearch(): void {
     checkConnection();
     createIndex("gigs");
 }
