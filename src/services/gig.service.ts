@@ -1,8 +1,12 @@
 import {
     BadRequestError,
     CustomError,
+    IHitsTotal,
+    IPaginateProps,
+    IQueryList,
     IRatingTypes,
     IReviewMessageDetails,
+    ISearchResult,
     ISellerDocument,
     ISellerGig,
     NotFoundError,
@@ -13,6 +17,7 @@ import { ELASTIC_SEARCH_URL, exchangeNamesAndRoutingKeys } from "@gig/config";
 import {
     addDataToIndex,
     deleteIndexedData,
+    elasticSearchClient,
     getIndexedData,
     updateIndexedData
 } from "@gig/elasticsearch";
@@ -23,6 +28,7 @@ import { sample } from "lodash";
 import cloudinary from "cloudinary";
 import { Logger } from "winston";
 import { isValidObjectId } from "mongoose";
+import { SearchResponse } from "@elastic/elasticsearch/lib/api/types";
 
 const logger: Logger = winstonLogger(
     `${ELASTIC_SEARCH_URL}`,
@@ -303,6 +309,245 @@ export async function updateGigReview(
         }
 
         throw new Error("Unexpected error occured. Please try again.")
+    }
+}
+
+export async function findGigsSearchBySellerId(
+    searchQuery: string,
+    active: boolean
+): Promise<ISearchResult> {
+    // try it on elasticsearch dev tools
+    const queryList: IQueryList[] = [
+        {
+            query_string: {
+                fields: ["sellerId"],
+                query: `*${searchQuery}*`
+            }
+        },
+        {
+            term: {
+                active
+            }
+        }
+    ];
+
+    try {
+        const result: SearchResponse = await elasticSearchClient.search({
+            index: "gigs",
+            query: {
+                bool: {
+                    must: queryList
+                }
+            }
+        });
+
+        const total: IHitsTotal = result.hits.total as IHitsTotal;
+        const hits = result.hits.hits;
+
+        return { total: total.value, hits };
+    } catch (error) {
+        logger.error("GigService gigsSearchBySellerId() method error:", error);
+        return { total: 0, hits: [] };
+    }
+}
+
+export async function gigsSearch(
+    searchQuery: string,
+    paginate: IPaginateProps,
+    min: number,
+    max: number,
+    deliveryTime?: string,
+): Promise<ISearchResult> {
+    const { from, size, type } = paginate;
+    // try it on elasticsearch dev tools
+    const queryList: IQueryList[] = [
+        {
+            query_string: {
+                fields: [
+                    "username",
+                    "title",
+                    "description",
+                    "basicDescription",
+                    "basicTitle",
+                    "categories",
+                    "subCategories",
+                    "tags"
+                ],
+                query: `*${searchQuery}*`
+            }
+        },
+        {
+            term: {
+                active: true
+            }
+        }
+    ];
+
+    if (deliveryTime !== "undefined") {
+        queryList.push({
+            query_string: {
+                fields: ["expectedDelivery"],
+                query: `*${deliveryTime}*`
+            }
+        });
+    }
+
+    if (!isNaN(min) && !isNaN(max)) {
+        queryList.push({
+            range: {
+                price: {
+                    gte: min,
+                    lte: max
+                }
+            }
+        });
+    }
+
+    try {
+        const result: SearchResponse = await elasticSearchClient.search({
+            index: "gigs",
+            size,
+            query: {
+                bool: {
+                    must: queryList
+                }
+            },
+            sort: [
+                {
+                    sortId: type === "forward" ? "asc" : "desc"
+                }
+            ],
+            // startFrom for pagination
+            ...(from !== "0" && { search_after: [from] })
+        });
+
+        const total: IHitsTotal = result.hits.total as IHitsTotal;
+        const hits = result.hits.hits;
+
+        return { total: total.value, hits };
+    } catch (error) {
+        logger.error("GigService gigsSearch() method error:", error);
+        return { total: 0, hits: [] };
+    }
+}
+
+export async function gigsSearchByCategory(
+    searchQuery: string
+): Promise<ISearchResult> {
+    try {
+        const result: SearchResponse = await elasticSearchClient.search({
+            index: "gigs",
+            size: 10,
+            query: {
+                bool: {
+                    must: [
+                        {
+                            query_string: {
+                                fields: ["categories"],
+                                query: `*${searchQuery}*`
+                            }
+                        },
+                        {
+                            term: {
+                                active: true
+                            }
+                        }
+                    ]
+                }
+            }
+        });
+
+        const total: IHitsTotal = result.hits.total as IHitsTotal;
+        const hits = result.hits.hits;
+
+        return { total: total.value, hits };
+    } catch (error) {
+        logger.error("GigService gigsSearchByCategory() method error:", error);
+        return { total: 0, hits: [] };
+    }
+}
+
+export async function getMoreGigsLikeThis(
+    gigId: string
+): Promise<ISearchResult> {
+    try {
+        const result: SearchResponse = await elasticSearchClient.search({
+            index: "gigs",
+            size: 5,
+            query: {
+                more_like_this: {
+                    fields: [
+                        "username",
+                        "title",
+                        "description",
+                        "basicDescription",
+                        "basicTitle",
+                        "categories",
+                        "subCategories",
+                        "tags"
+                    ],
+                    like: [
+                        {
+                            _index: "gigs",
+                            _id: gigId
+                        }
+                    ]
+                }
+            }
+        });
+
+        const total: IHitsTotal = result.hits.total as IHitsTotal;
+        const hits = result.hits.hits;
+
+        return { total: total.value, hits };
+    } catch (error) {
+        logger.error("GigService getMoreGigsLikeThis() method error:", error);
+        return { total: 0, hits: [] };
+    }
+}
+
+export async function getTopRatedGigsByCategory(
+    searchQuery: string
+): Promise<ISearchResult> {
+    try {
+        const result: SearchResponse = await elasticSearchClient.search({
+            index: "gigs",
+            size: 10,
+            query: {
+                bool: {
+                    filter: {
+                        script: {
+                            script: {
+                                source: "doc['ratingSum'].value != 0 && (doc['ratingSum'].value / doc['ratingsCount'].value == params['threshold'])",
+                                lang: "painless",
+                                params: {
+                                    threshold: 5
+                                }
+                            }
+                        }
+                    },
+                    must: [
+                        {
+                            query_string: {
+                                fields: ["categories"],
+                                query: `*${searchQuery}*`
+                            }
+                        }
+                    ]
+                }
+            }
+        });
+
+        const total: IHitsTotal = result.hits.total as IHitsTotal;
+        const hits = result.hits.hits;
+
+        return { total: total.value, hits };
+    } catch (error) {
+        logger.error(
+            "GigService getTopRatedGigsByCategory() method error:",
+            error
+        );
+        return { total: 0, hits: [] };
     }
 }
 

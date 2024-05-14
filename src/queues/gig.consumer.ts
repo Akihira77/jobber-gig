@@ -39,14 +39,25 @@ export async function consumeGigDirectMessages(
 
         await channel.consume(
             jobberQueue.queue,
-            async (message: ConsumeMessage | null) => {
-                const { type } = JSON.parse(message!.content.toString());
+            async (msg: ConsumeMessage | null) => {
+                try {
+                    const { type, gigReview } = JSON.parse(msg!.content.toString());
 
-                if (type === "updateGigReview") {
-                    const { gigReview } = JSON.parse(message!.content.toString());
-                    await updateGigReview(gigReview);
+                    if (type === "updateGigReview") {
+                        await updateGigReview(gigReview);
+                        channel.ack(msg!);
+                        return;
+                    }
+
+                    channel.reject(msg!, false);
+                } catch (error) {
+                    channel.reject(msg!, false);
+
+                    log.error(
+                        "consuming message got errors. consumeSeedDirectMessages()",
+                        error
+                    );
                 }
-                channel.ack(message!);
             }
         );
     } catch (error) {
@@ -79,14 +90,23 @@ export async function consumeSeedDirectMessages(
 
         await channel.consume(
             jobberQueue.queue,
-            async (message: ConsumeMessage | null) => {
-                const { sellers, count } = JSON.parse(
-                    message!.content.toString()
-                );
+            async (msg: ConsumeMessage | null) => {
+                try {
+                    const { sellers, count } = JSON.parse(
+                        msg!.content.toString()
+                    );
 
-                await seedData(sellers, count);
+                    await seedData(sellers, count);
 
-                channel.ack(message!);
+                    channel.ack(msg!);
+                } catch (error) {
+                    channel.reject(msg!, false);
+
+                    log.error(
+                        "consuming message go errors. consumeSeedDirectMessages()",
+                        error
+                    );
+                }
             }
         );
     } catch (error) {

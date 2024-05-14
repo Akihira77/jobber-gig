@@ -1,29 +1,22 @@
 import express, { Router } from "express";
-import * as create from "@gig/controllers/create";
-import * as update from "@gig/controllers/update";
-import * as remove from "@gig/controllers/delete";
-import * as get from "@gig/controllers/get";
-import * as search from "@gig/controllers/search";
-import * as seed from "@gig/controllers/seed";
+import * as gigController from "@gig/controllers/gig.controller";
 
 const router = express.Router();
 
 export function gigRoutes(): Router {
-    router.get("/:gigId", get.gigById);
-    router.get("/seller/:sellerId", get.sellerActiveGigs);
-    router.get("/seller/inactive/:sellerId", get.sellerInactiveGigs);
-    router.get("/search/:from/:size/:type", search.gigsQuerySearch);
-    router.get("/category/:username", get.gigsByCategory);
-    router.get("/top/:username", get.topRatedGigsByCategory);
-    router.get("/similar/:gigId", get.gigsMoreLikeThis);
+    router.get("/:gigId", gigController.getGigById);
+    router.get("/seller/:sellerId", gigController.getSellerActiveGigs);
+    router.get("/seller/inactive/:sellerId", gigController.getSellerInactiveGigs);
+    router.get("/search/:from/:size/:type", gigController.getGigsQuerySearch);
+    router.get("/category/:username", gigController.getGigsByCategory);
+    router.get("/top/:username", gigController.getTopRatedGigsByCategory);
+    router.get("/similar/:gigId", gigController.getGigsMoreLikeThis);
+    router.post("/create", gigController.addGig);
+    router.put("/update/:gigId", gigController.updateGig);
+    router.put("/status/:gigId", gigController.updateActiveStatusGig);
+    router.delete("/:gigId/:sellerId", gigController.removeGig);
 
-    router.post("/create", create.gig);
-
-    router.put("/seed/:count", seed.gigs);
-    router.put("/update/:gigId", update.gig);
-    router.put("/status/:gigId", update.gigUpdateActiveStatus);
-
-    router.delete("/:gigId/:sellerId", remove.gig);
+    router.put("/seed/:count", gigController.populateGigs);
 
     return router;
 }

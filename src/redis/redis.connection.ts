@@ -10,12 +10,12 @@ const log: Logger = winstonLogger(
 );
 
 export type RedisClient = ReturnType<typeof createClient>;
-export const client: RedisClient = createClient({ url: `${REDIS_HOST}` });
+export const redisClient: RedisClient = createClient({ url: `${REDIS_HOST}` });
 
 export async function redisConnect(): Promise<void> {
     try {
-        await client.connect();
-        log.info(`GigService Redis Connection ${await client.ping()}`);
+        await redisClient.connect();
+        log.info(`GigService Redis Connection ${await redisClient.ping()}`);
 
         catchError();
     } catch (error) {
@@ -24,7 +24,7 @@ export async function redisConnect(): Promise<void> {
 }
 
 function catchError(): void {
-    client.on("error", (error: unknown) => {
+    redisClient.on("error", (error: unknown) => {
         log.error(error);
     });
 }
