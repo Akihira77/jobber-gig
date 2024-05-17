@@ -6,16 +6,9 @@ import jwt from "jsonwebtoken";
 import {
     CustomError,
     IAuthPayload,
-    IErrorResponse,
-    winstonLogger
+    IErrorResponse
 } from "@Akihira77/jobber-shared";
-import { Logger } from "winston";
-import {
-    API_GATEWAY_URL,
-    ELASTIC_SEARCH_URL,
-    JWT_TOKEN,
-    PORT
-} from "@gig/config";
+import { API_GATEWAY_URL, JWT_TOKEN, logger, PORT } from "@gig/config";
 import {
     Application,
     NextFunction,
@@ -37,12 +30,6 @@ import {
 } from "@gig/queues/gig.consumer";
 
 export let gigChannel: Channel;
-
-const log: Logger = winstonLogger(
-    `${ELASTIC_SEARCH_URL}`,
-    "gigServer",
-    "debug"
-);
 
 export function start(app: Application): void {
     securityMiddleware(app);
@@ -67,7 +54,7 @@ function securityMiddleware(app: Application): void {
     );
 
     app.use((req: Request, _res: Response, next: NextFunction) => {
-        // console.log(req.headers);
+        // console.logger(req.headers);
         if (req.headers.authorization) {
             const token = req.headers.authorization.split(" ")[1];
             const payload = jwt.verify(token, JWT_TOKEN!) as IAuthPayload;
@@ -107,7 +94,10 @@ function gigErrorHandler(app: Application): void {
             res: Response,
             next: NextFunction
         ) => {
-            log.error(`GigService ${error.comingFrom}:`, error);
+            logger("server.ts - gigErrorHandler()").error(
+                `GigService ${error.comingFrom}:`,
+                error
+            );
 
             if (error instanceof CustomError) {
                 res.status(error.statusCode).json(error.serializeErrors());
@@ -120,11 +110,19 @@ function gigErrorHandler(app: Application): void {
 function startServer(app: Application): void {
     try {
         const httpServer: http.Server = new http.Server(app);
-        log.info(`Gig server has started with pid ${process.pid}`);
+        logger("server.ts - startServer()").info(
+            `GigService has started with pid ${process.pid}`
+        );
+
         httpServer.listen(Number(PORT), () => {
-            log.info(`Gig server running on port ${PORT}`);
+            logger("server.ts - startServer()").info(
+                `GigService running on port ${PORT}`
+            );
         });
     } catch (error) {
-        log.error("GigService startServer() method error:", error);
+        logger("server.ts - startServer()").error(
+            "GigService startServer() method error:",
+            error
+        );
     }
 }

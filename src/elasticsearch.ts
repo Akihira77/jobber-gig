@@ -1,14 +1,7 @@
 import { Client } from "@elastic/elasticsearch";
-import { Logger } from "winston";
-import { ISellerGig, winstonLogger } from "@Akihira77/jobber-shared";
+import { ISellerGig } from "@Akihira77/jobber-shared";
 import { ClusterHealthResponse } from "@elastic/elasticsearch/lib/api/types";
-import { ELASTIC_SEARCH_URL } from "@gig/config";
-
-const log: Logger = winstonLogger(
-    `${ELASTIC_SEARCH_URL}`,
-    "gigElasticSearchServer",
-    "debug"
-);
+import { ELASTIC_SEARCH_URL, logger } from "@gig/config";
 
 export const elasticSearchClient = new Client({
     node: `${ELASTIC_SEARCH_URL}`
@@ -17,18 +10,25 @@ export const elasticSearchClient = new Client({
 export async function checkConnection(): Promise<void> {
     let isConnected = false;
     while (!isConnected) {
-        log.info("GigService connecting to Elasticsearch...");
+        logger("elasticsearch.ts - checkConnection()").info(
+            "GigService connecting to Elasticsearch..."
+        );
         try {
             const health: ClusterHealthResponse =
                 await elasticSearchClient.cluster.health({});
 
-            log.info(
+            logger("elasticsearch.ts - checkConnection()").info(
                 `GigService Elasticsearch health status - ${health.status}`
             );
             isConnected = true;
         } catch (error) {
-            log.error("Connection to Elasticsearch failed. Retrying...");
-            log.error("GigService checkConnection() method error:", error);
+            logger("elasticsearch.ts - checkConnection()").error(
+                "Connection to Elasticsearch failed. Retrying..."
+            );
+            logger("elasticsearch.ts - checkConnection()").error(
+                "GigService checkConnection() method error:",
+                error
+            );
         }
     }
 }
@@ -45,7 +45,9 @@ export async function createIndex(indexName: string): Promise<void> {
     try {
         const existingIndex: boolean = await checkExistingIndex(indexName);
         if (existingIndex) {
-            log.info(`Index ${indexName} already exist.`);
+            logger("elasticsearch.ts - createIndex()").info(
+                `Index ${indexName} already exist in Elasticsearch.`
+            );
         } else {
             await elasticSearchClient.indices.create({ index: indexName });
 
@@ -53,11 +55,18 @@ export async function createIndex(indexName: string): Promise<void> {
             // so we can access the document right after creating an index
             await elasticSearchClient.indices.refresh({ index: indexName });
 
-            log.info(`Created index ${indexName}`);
+            logger("elasticsearch.ts - createIndex()").info(
+                `Created index ${indexName} in Elasticsearch`
+            );
         }
     } catch (error) {
-        log.error(`An error occured while creating the index ${indexName}`);
-        log.error("GigService createIndex() method error:", error);
+        logger("elasticsearch.ts - createIndex()").error(
+            `An error occured while creating the index ${indexName}`
+        );
+        logger("elasticsearch.ts - createIndex()").error(
+            "GigService createIndex() method error:",
+            error
+        );
     }
 }
 
@@ -67,7 +76,7 @@ export async function getDocumentCount(index: string): Promise<number> {
 
         return result.count;
     } catch (error) {
-        log.error(
+        logger("elasticsearc.ts - getDocumentCount()").error(
             "GigService elasticsearch getDocumentCount() method error:",
             error
         );
@@ -84,7 +93,7 @@ export async function getIndexedData(
 
         return result?._source as ISellerGig;
     } catch (error) {
-        log.error(
+        logger("elasticsearch.ts - getIndexedData()").error(
             "GigService elasticsearch getIndexedData() method error:",
             error
         );
@@ -100,7 +109,7 @@ export async function addDataToIndex(
     try {
         await elasticSearchClient.index({ index, id: itemId, document });
     } catch (error) {
-        log.error(
+        logger("elasticsearch.ts - addDataToIndex()").error(
             "GigService elasticsearch addDataToIndex() method error:",
             error
         );
@@ -115,7 +124,7 @@ export async function updateIndexedData(
     try {
         await elasticSearchClient.update({ index, id: itemId, doc: document });
     } catch (error) {
-        log.error(
+        logger("elasticsearch.ts - updateIndexedData()").error(
             "GigService elasticsearch updateIndexedData() method error:",
             error
         );
@@ -129,7 +138,7 @@ export async function deleteIndexedData(
     try {
         await elasticSearchClient.delete({ index, id: itemId });
     } catch (error) {
-        log.error(
+        logger("elasticsearch.ts - deleteIndexedData()").error(
             "GigService elasticsearch deleteIndexedData() method error:",
             error
         );

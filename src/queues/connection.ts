@@ -1,27 +1,24 @@
-import { winstonLogger } from "@Akihira77/jobber-shared";
-import { ELASTIC_SEARCH_URL, RABBITMQ_ENDPOINT } from "@gig/config";
+import { logger, RABBITMQ_ENDPOINT } from "@gig/config";
 import client, { Connection, Channel } from "amqplib";
-import { Logger } from "winston";
 
-const log: Logger = winstonLogger(
-    `${ELASTIC_SEARCH_URL}`,
-    "gigQueueConnection",
-    "debug"
-);
-
-export async function createConnection(): Promise<Channel | undefined> {
+export async function createConnection(): Promise<Channel> {
     try {
         const connection: Connection = await client.connect(
             `${RABBITMQ_ENDPOINT}`
         );
         const channel: Channel = await connection.createChannel();
-        log.info("Gig server connected to queue successfully...");
+        logger("queues/connection.ts - createConnection()").info(
+            "GigService connected to RabbitMQ successfully..."
+        );
         closeConnection(channel, connection);
 
         return channel;
     } catch (error) {
-        log.error("GigService createConnection() method error:", error);
-        return undefined;
+        logger("queues/connection.ts - createConnection()").error(
+            "GigService createConnection() method error:",
+            error
+        );
+        process.exit(1);
     }
 }
 

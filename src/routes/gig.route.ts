@@ -6,7 +6,10 @@ const router = express.Router();
 export function gigRoutes(): Router {
     router.get("/:gigId", gigController.getGigById);
     router.get("/seller/:sellerId", gigController.getSellerActiveGigs);
-    router.get("/seller/inactive/:sellerId", gigController.getSellerInactiveGigs);
+    router.get(
+        "/seller/inactive/:sellerId",
+        gigController.getSellerInactiveGigs
+    );
     router.get("/search/:from/:size/:type", gigController.getGigsQuerySearch);
     router.get("/category/:username", gigController.getGigsByCategory);
     router.get("/top/:username", gigController.getTopRatedGigsByCategory);

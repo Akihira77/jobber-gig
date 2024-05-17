@@ -1,15 +1,7 @@
-import { winstonLogger } from "@Akihira77/jobber-shared";
-import { ELASTIC_SEARCH_URL, exchangeNamesAndRoutingKeys } from "@gig/config";
-import { Logger } from "winston";
+import { exchangeNamesAndRoutingKeys, logger } from "@gig/config";
 import { createConnection } from "@gig/queues/connection";
 import { Channel, ConsumeMessage } from "amqplib";
 import { seedData, updateGigReview } from "@gig/services/gig.service";
-
-const log: Logger = winstonLogger(
-    `${ELASTIC_SEARCH_URL}`,
-    "gigServiceConsumer",
-    "debug"
-);
 
 export async function consumeGigDirectMessages(
     channel: Channel
@@ -41,7 +33,9 @@ export async function consumeGigDirectMessages(
             jobberQueue.queue,
             async (msg: ConsumeMessage | null) => {
                 try {
-                    const { type, gigReview } = JSON.parse(msg!.content.toString());
+                    const { type, gigReview } = JSON.parse(
+                        msg!.content.toString()
+                    );
 
                     if (type === "updateGigReview") {
                         await updateGigReview(gigReview);
@@ -53,7 +47,9 @@ export async function consumeGigDirectMessages(
                 } catch (error) {
                     channel.reject(msg!, false);
 
-                    log.error(
+                    logger(
+                        "queues/gig.consumer.ts - consumeGigDirectMessages()"
+                    ).error(
                         "consuming message got errors. consumeSeedDirectMessages()",
                         error
                     );
@@ -61,7 +57,10 @@ export async function consumeGigDirectMessages(
             }
         );
     } catch (error) {
-        log.error("GigService consumeGigDirectMessages() method error:", error);
+        logger("queues/gig.consumer.ts - consumeGigDirectMessages()").error(
+            "GigService consumeGigDirectMessages() method error:",
+            error
+        );
     }
 }
 
@@ -102,7 +101,9 @@ export async function consumeSeedDirectMessages(
                 } catch (error) {
                     channel.reject(msg!, false);
 
-                    log.error(
+                    logger(
+                        "queues/gig.consumer.ts - consumeSeedDirectMessages()"
+                    ).error(
                         "consuming message go errors. consumeSeedDirectMessages()",
                         error
                     );
@@ -110,7 +111,7 @@ export async function consumeSeedDirectMessages(
             }
         );
     } catch (error) {
-        log.error(
+        logger("queues/gig.consumer.ts - consumeSeedDirectMessages()").error(
             "GigService consumeSeedDirectMessages() method error:",
             error
         );

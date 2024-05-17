@@ -50,8 +50,7 @@ export async function getSellerActiveGigs(
         const gigs: ISellerGig[] = await GigModel.find({
             sellerId,
             active: true
-        })
-            .exec();
+        }).exec();
 
         gigs.forEach((gig) => {
             const gigOmit_Id = gig.toJSON?.() as ISellerGig;
@@ -61,7 +60,7 @@ export async function getSellerActiveGigs(
         return results;
     } catch (error) {
         logger.error("GigService getSellerActiveGigs() method error", error);
-        throw new Error("Unexpected error occured. Please try again.")
+        throw new Error("Unexpected error occured. Please try again.");
     }
 }
 
@@ -73,8 +72,7 @@ export async function getSellerInactiveGigs(
         const gigs: ISellerGig[] = await GigModel.find({
             sellerId,
             active: false
-        })
-            .exec();
+        }).exec();
 
         gigs.forEach((gig) => {
             const gigOmit_Id = gig.toJSON?.() as ISellerGig;
@@ -84,16 +82,23 @@ export async function getSellerInactiveGigs(
         return results;
     } catch (error) {
         logger.error("GigService getSellerInactiveGigs() method error", error);
-        throw new Error("Unexpected error occured. Please try again.")
+        throw new Error("Unexpected error occured. Please try again.");
     }
 }
 
 export async function createGig(request: ISellerGig): Promise<ISellerGig> {
     try {
         const { expectedDelivery } = request;
-        if (!(expectedDelivery.includes("Day Delivery") || expectedDelivery.includes("Days Delivery"))
+        if (
+            !(
+                expectedDelivery.includes("Day Delivery") ||
+                expectedDelivery.includes("Days Delivery")
+            )
         ) {
-            throw new BadRequestError("Error expected delivery field is incorrect value", "GigService createGig() method")
+            throw new BadRequestError(
+                "Error expected delivery field is incorrect value",
+                "GigService createGig() method"
+            );
         }
 
         const createdGig = await GigModel.create(request);
@@ -108,7 +113,7 @@ export async function createGig(request: ISellerGig): Promise<ISellerGig> {
                 usersService.seller.routingKey,
                 JSON.stringify({
                     type: "update-gig-count",
-                    gigSellerId: `${gigOmit_Id.sellerId}`,
+                    sellerId: gigOmit_Id.sellerId,
                     count: 1
                 }),
                 "Details sent to users service"
@@ -120,10 +125,10 @@ export async function createGig(request: ISellerGig): Promise<ISellerGig> {
     } catch (error) {
         logger.error("GigService createGig() method error", error);
         if (error instanceof CustomError) {
-            throw error
+            throw error;
         }
 
-        throw new Error("Unexpected error occured. Please try again.")
+        throw new Error("Unexpected error occured. Please try again.");
     }
 }
 
@@ -178,7 +183,7 @@ export async function deleteGig(
         logger.error("GigService deleteGig() method error", error);
 
         if (error instanceof CustomError) {
-            throw error
+            throw error;
         }
 
         throw new Error("Unexpected error occured. Please try again.");
@@ -191,10 +196,13 @@ export async function updateGig(
 ): Promise<ISellerGig | null> {
     try {
         if (!isValidObjectId(gigId)) {
-            throw new BadRequestError("Invalid gig id", "GigService updateGig() method")
+            throw new BadRequestError(
+                "Invalid gig id",
+                "GigService updateGig() method"
+            );
         }
 
-        const updatedGig = (await GigModel.findOneAndUpdate(
+        const updatedGig = await GigModel.findOneAndUpdate(
             { _id: gigId, sellerId: gigData.sellerId },
             {
                 $set: {
@@ -213,21 +221,25 @@ export async function updateGig(
             {
                 new: true
             }
-        ).exec());
+        ).exec();
 
         if (updatedGig) {
             const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig;
-            await updateIndexedData("gigs", updatedGig._id!.toString(), gigOmit_Id);
+            await updateIndexedData(
+                "gigs",
+                updatedGig._id!.toString(),
+                gigOmit_Id
+            );
         }
 
         return updatedGig;
     } catch (error) {
-        logger.error("GigService updateGig() method error", error)
+        logger.error("GigService updateGig() method error", error);
         if (error instanceof CustomError) {
-            throw error
+            throw error;
         }
 
-        throw new Error("Unexpected error occured. Please try again.")
+        throw new Error("Unexpected error occured. Please try again.");
     }
 }
 
@@ -237,10 +249,13 @@ export async function updateActiveGigProp(
 ): Promise<ISellerGig | null> {
     try {
         if (!isValidObjectId(gigId)) {
-            throw new BadRequestError("Invalid gig id", "GigService updateActiveGigProp() method")
+            throw new BadRequestError(
+                "Invalid gig id",
+                "GigService updateActiveGigProp() method"
+            );
         }
 
-        const updatedGig = (await GigModel.findOneAndUpdate(
+        const updatedGig = await GigModel.findOneAndUpdate(
             { _id: gigId },
             {
                 $set: {
@@ -248,23 +263,27 @@ export async function updateActiveGigProp(
                 }
             },
             {
-                new: true,
+                new: true
             }
-        ).exec());
+        ).exec();
 
         if (updatedGig) {
             const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig;
-            await updateIndexedData("gigs", gigOmit_Id.id!.toString(), gigOmit_Id);
+            await updateIndexedData(
+                "gigs",
+                gigOmit_Id.id!.toString(),
+                gigOmit_Id
+            );
         }
 
         return updatedGig;
     } catch (error) {
-        logger.error("GigService updateActiveGigProp() method error", error)
+        logger.error("GigService updateActiveGigProp() method error", error);
         if (error instanceof CustomError) {
-            throw error
+            throw error;
         }
 
-        throw new Error("Unexpected error occured. Please try again.")
+        throw new Error("Unexpected error occured. Please try again.");
     }
 }
 
@@ -273,7 +292,10 @@ export async function updateGigReview(
 ): Promise<void> {
     try {
         if (!isValidObjectId(request.gigId)) {
-            throw new BadRequestError("Invalid gig id", "GigService updateGigReview() method")
+            throw new BadRequestError(
+                "Invalid gig id",
+                "GigService updateGigReview() method"
+            );
         }
 
         const ratingTypes: IRatingTypes = {
@@ -285,7 +307,7 @@ export async function updateGigReview(
         };
         const ratingKey: string = ratingTypes[`${request.rating}`];
 
-        const updatedGig = (await GigModel.findOneAndUpdate(
+        const updatedGig = await GigModel.findOneAndUpdate(
             { _id: request.gigId, sellerId: request.sellerId },
             {
                 $inc: {
@@ -296,19 +318,23 @@ export async function updateGigReview(
                 }
             },
             { new: true, upsert: true }
-        ).exec());
+        ).exec();
 
         if (updatedGig) {
             const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig;
-            await updateIndexedData("gigs", updatedGig._id!.toString(), gigOmit_Id);
+            await updateIndexedData(
+                "gigs",
+                updatedGig._id!.toString(),
+                gigOmit_Id
+            );
         }
     } catch (error) {
-        logger.error("GigService updateGigReview() method error", error)
+        logger.error("GigService updateGigReview() method error", error);
         if (error instanceof CustomError) {
-            throw error
+            throw error;
         }
 
-        throw new Error("Unexpected error occured. Please try again.")
+        throw new Error("Unexpected error occured. Please try again.");
     }
 }
 
@@ -356,7 +382,7 @@ export async function gigsSearch(
     paginate: IPaginateProps,
     min: number,
     max: number,
-    deliveryTime?: string,
+    deliveryTime?: string
 ): Promise<ISearchResult> {
     const { from, size, type } = paginate;
     // try it on elasticsearch dev tools
@@ -582,8 +608,9 @@ export async function seedData(
         { sum: 5, count: 1 }
     ];
 
-    for (let i = 0; i < sellers.length; i++) {
-        const sellerDoc: ISellerDocument = sellers[i];
+    for (let i = 0; i < parseInt(count); i++) {
+        const sellerDoc: ISellerDocument =
+            sellers[Math.floor(Math.random() * (sellers.length - 1))];
         const title = `I will ${faker.word.words(5)}`;
         const basicTitle = faker.commerce.productName();
         const basicDescription = faker.commerce.productDescription();
@@ -622,6 +649,6 @@ export async function seedData(
         };
 
         console.log(`***SEEDING GIG*** - ${i + 1} of ${count}`);
-        await createGig(gig);
+        createGig(gig);
     }
 }

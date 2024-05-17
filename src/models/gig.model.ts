@@ -1,9 +1,9 @@
 import { ISellerGig } from "@Akihira77/jobber-shared";
-import mongoose, { Model, model } from "mongoose";
+import { Model, model, Schema, Document } from "mongoose";
 
-const gigSchema = new mongoose.Schema(
+const gigSchema = new Schema(
     {
-        sellerId: { type: mongoose.Schema.Types.ObjectId, index: true },
+        sellerId: { type: Schema.Types.ObjectId, index: true },
         username: { type: String, required: true },
         email: { type: String, required: true },
         profilePicture: { type: String, required: true },
@@ -48,7 +48,7 @@ const gigSchema = new mongoose.Schema(
     {
         versionKey: false,
         toJSON: {
-            transform(_doc, rec: Record<string, any>) {
+            transform(_doc: Document, rec: Record<string, any>) {
                 rec.id = rec._id;
                 delete rec._id;
                 return rec;

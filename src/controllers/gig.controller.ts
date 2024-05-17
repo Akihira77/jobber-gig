@@ -1,4 +1,11 @@
-import { BadRequestError, uploads, ISellerGig, ISearchResult, IPaginateProps, isDataURL } from "@Akihira77/jobber-shared";
+import {
+    BadRequestError,
+    uploads,
+    ISellerGig,
+    ISearchResult,
+    IPaginateProps,
+    isDataURL
+} from "@Akihira77/jobber-shared";
 import { exchangeNamesAndRoutingKeys } from "@gig/config";
 import { getDocumentCount } from "@gig/elasticsearch";
 import { publishDirectMessage } from "@gig/queues/gig.producer";
@@ -106,7 +113,9 @@ export async function getTopRatedGigsByCategory(
         `selectedCategories:${req.params.username}`
     );
     const resultHits: ISellerGig[] = [];
-    const gigs: ISearchResult = await gigService.getTopRatedGigsByCategory(`${category}`);
+    const gigs: ISearchResult = await gigService.getTopRatedGigsByCategory(
+        `${category}`
+    );
 
     for (const item of gigs.hits) {
         resultHits.push(item._source as ISellerGig);
@@ -127,7 +136,9 @@ export async function getGigsByCategory(
         `selectedCategories:${req.params.username}`
     );
     const resultHits: ISellerGig[] = [];
-    const gigs: ISearchResult = await gigService.gigsSearchByCategory(`${category}`);
+    const gigs: ISearchResult = await gigService.gigsSearchByCategory(
+        `${category}`
+    );
 
     for (const item of gigs.hits) {
         resultHits.push(item._source as ISellerGig);
@@ -145,7 +156,9 @@ export async function getGigsMoreLikeThis(
     res: Response
 ): Promise<void> {
     const resultHits: ISellerGig[] = [];
-    const gigs: ISearchResult = await gigService.getMoreGigsLikeThis(req.params.gigId);
+    const gigs: ISearchResult = await gigService.getMoreGigsLikeThis(
+        req.params.gigId
+    );
 
     for (const item of gigs.hits) {
         resultHits.push(item._source as ISellerGig);
@@ -169,9 +182,16 @@ export async function getGigsQuerySearch(
         size: parseInt(`${size}`),
         type
     };
-    const { query, delivery_time, minprice, minPrice, maxprice, maxPrice, min, max } =
-        req.query;
-
+    const {
+        query,
+        delivery_time,
+        minprice,
+        minPrice,
+        maxprice,
+        maxPrice,
+        min,
+        max
+    } = req.query;
 
     const MIN_PRICE = String(minprice || minPrice || min);
     const MAX_PRICE = String(maxprice || maxPrice || max);
@@ -180,7 +200,7 @@ export async function getGigsQuerySearch(
         paginate,
         parseInt(MIN_PRICE, 10),
         parseInt(MAX_PRICE, 10),
-        String(delivery_time),
+        String(delivery_time)
     );
 
     for (const item of gigs.hits) {
@@ -278,6 +298,7 @@ export async function populateGigs(req: Request, res: Response): Promise<void> {
     );
 
     res.status(StatusCodes.CREATED).json({
-        message: "Seed gigs successfully,"
+        message: "Seed gigs successfully.",
+        total: count
     });
 }
