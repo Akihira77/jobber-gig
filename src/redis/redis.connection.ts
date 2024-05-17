@@ -8,16 +8,21 @@ export async function redisConnect(): Promise<void> {
     try {
         await redisClient.connect();
         if (redisClient.isReady) {
-            logger.info(`GigService Redis Connected: ${redisClient.isReady}`);
+            logger("redis/redis.connection() - redisConnect()").info(
+                `GigService Redis Connected: ${redisClient.isReady}`
+            );
         }
         catchError();
     } catch (error) {
-        logger.error("GigService redisConnect() method error:", error);
+        logger("redis/redis.connection() - redisConnect()").error(
+            "GigService redisConnect() method error:",
+            error
+        );
     }
 }
 
 function catchError(): void {
     redisClient.on("error", (error: unknown) => {
-        logger.error(error);
+        logger("redis/redis.connection() - redisConnect()").error(error);
     });
 }

@@ -48,7 +48,7 @@ const gigSchema = new Schema(
     {
         versionKey: false,
         toJSON: {
-            transform(_doc: Document, rec: Record<string, any>) {
+            transform(_doc: Document, rec: Record<string, Document>) {
                 rec.id = rec._id;
                 delete rec._id;
                 return rec;
