@@ -28,6 +28,7 @@ import {
     consumeGigDirectMessages,
     consumeSeedDirectMessages
 } from "@gig/queues/gig.consumer";
+import morgan from "morgan";
 
 export let gigChannel: Channel;
 
@@ -69,6 +70,7 @@ function standardMiddleware(app: Application): void {
     app.use(compression());
     app.use(json({ limit: "200mb" }));
     app.use(urlencoded({ extended: true, limit: "200mb" }));
+    app.use(morgan("dev"));
 }
 
 function routesMiddleware(app: Application): void {
