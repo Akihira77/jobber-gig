@@ -8,7 +8,7 @@ import {
     IAuthPayload,
     IErrorResponse
 } from "@Akihira77/jobber-shared";
-import { API_GATEWAY_URL, JWT_TOKEN, logger, PORT } from "@gig/config";
+import { API_GATEWAY_URL, JWT_TOKEN, PORT } from "@gig/config";
 import {
     Application,
     NextFunction,
@@ -20,26 +20,25 @@ import {
 import hpp from "hpp";
 import helmet from "helmet";
 import cors from "cors";
-import { checkConnection, createIndex } from "@gig/elasticsearch";
+import { ElasticSearchClient } from "@gig/elasticsearch";
 import { appRoutes } from "@gig/routes";
-import { createConnection } from "@gig/queues/connection";
 import { Channel } from "amqplib";
-import {
-    consumeGigDirectMessages,
-    consumeSeedDirectMessages
-} from "@gig/queues/gig.consumer";
-import morgan from "morgan";
+import { Logger } from "winston";
+import { GigQueue } from "./queues/gig.queue";
 
 export let gigChannel: Channel;
 
-export function start(app: Application): void {
+export async function start(
+    app: Application,
+    logger: (moduleName: string) => Logger
+): Promise<void> {
+    const queue = await startQueues(logger);
+    const elastic = await startElasticSearch(logger);
     securityMiddleware(app);
     standardMiddleware(app);
-    routesMiddleware(app);
-    startQueues();
-    startElasticSearch();
-    gigErrorHandler(app);
-    startServer(app);
+    gigErrorHandler(app, logger);
+    routesMiddleware(app, queue, elastic, logger);
+    startServer(app, logger);
 }
 
 function securityMiddleware(app: Application): void {
@@ -70,25 +69,36 @@ function standardMiddleware(app: Application): void {
     app.use(compression());
     app.use(json({ limit: "200mb" }));
     app.use(urlencoded({ extended: true, limit: "200mb" }));
-    app.use(morgan("dev"));
 }
 
-function routesMiddleware(app: Application): void {
-    appRoutes(app);
+function routesMiddleware(app: Application, queue: GigQueue, elastic: ElasticSearchClient, logger: (moduleName: string) => Logger): void {
+    appRoutes(app, queue, elastic, logger);
 }
 
-async function startQueues(): Promise<void> {
-    gigChannel = (await createConnection()) as Channel;
-    await consumeGigDirectMessages(gigChannel);
-    await consumeSeedDirectMessages(gigChannel);
+async function startQueues(
+    logger: (moduleName: string) => Logger
+): Promise<GigQueue> {
+    const gigChannel = new GigQueue(null, logger);
+    await gigChannel.consumeGigDirectMessages();
+    await gigChannel.consumeSeedDirectMessages();
+
+    return gigChannel
 }
 
-export function startElasticSearch(): void {
-    checkConnection();
-    createIndex("gigs");
+export async function startElasticSearch(
+    logger: (moduleName: string) => Logger
+): Promise<ElasticSearchClient> {
+    const elastic = new ElasticSearchClient(logger);
+    await elastic.checkConnection();
+    elastic.createIndex("gigs");
+
+    return elastic;
 }
 
-function gigErrorHandler(app: Application): void {
+function gigErrorHandler(
+    app: Application,
+    logger: (moduleName: string) => Logger
+): void {
     app.use(
         (
             error: IErrorResponse,
@@ -109,7 +119,10 @@ function gigErrorHandler(app: Application): void {
     );
 }
 
-function startServer(app: Application): void {
+function startServer(
+    app: Application,
+    logger: (moduleName: string) => Logger
+): void {
     try {
         const httpServer: http.Server = new http.Server(app);
         logger("server.ts - startServer()").info(
