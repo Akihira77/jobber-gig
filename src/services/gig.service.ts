@@ -400,13 +400,12 @@ export class GigService {
         }
     ];
 
-    if (deliveryTime !== "undefined") {
+    if (deliveryTime && deliveryTime !== "undefined") {
         queryList.push({
-            query_string: {
-                fields: ["expectedDelivery"],
-                query: `*${deliveryTime}*`
+            match_phrase: {
+                expectedDelivery: deliveryTime
             }
-        });
+        } as any);
     }
 
     if (!isNaN(min) && !isNaN(max)) {

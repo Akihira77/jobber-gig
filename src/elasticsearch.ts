@@ -37,6 +37,8 @@ export class ElasticSearchClient {
                 );
             }
         }
+
+        this.closeConnection(this.client);
     }
 
     async runQuery(query: any): Promise<SearchResponse> {
@@ -148,5 +150,11 @@ export class ElasticSearchClient {
                 error
             );
         }
+    }
+
+    closeConnection(client: Client): void {
+        process.once("exit", async() => {
+            await client.close();
+        })
     }
 }

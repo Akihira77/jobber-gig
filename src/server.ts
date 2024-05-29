@@ -78,11 +78,12 @@ function routesMiddleware(app: Application, queue: GigQueue, elastic: ElasticSea
 async function startQueues(
     logger: (moduleName: string) => Logger
 ): Promise<GigQueue> {
-    const gigChannel = new GigQueue(null, logger);
-    await gigChannel.consumeGigDirectMessages();
-    await gigChannel.consumeSeedDirectMessages();
+    const queue = new GigQueue(null, logger);
+    await queue.createConnection();
+    queue.consumeGigDirectMessages();
+    queue.consumeSeedDirectMessages();
 
-    return gigChannel
+    return queue
 }
 
 export async function startElasticSearch(
