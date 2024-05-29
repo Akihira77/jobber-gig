@@ -2,7 +2,9 @@ import { DATABASE_URL } from "@gig/config";
 import mongoose, { Mongoose } from "mongoose";
 import { Logger } from "winston";
 
-export const databaseConnection = async (logger: (moduleName?: string) => Logger): Promise<Mongoose> => {
+export const databaseConnection = async (
+    logger: (moduleName?: string) => Logger
+): Promise<Mongoose> => {
     try {
         // console.log(DATABASE_URL);
         const db = await mongoose.connect(`${DATABASE_URL}`);

@@ -10,7 +10,12 @@ import { ElasticSearchClient } from "./elasticsearch";
 
 const BASE_PATH = "/api/v1/gig";
 
-export function appRoutes(app: Application, queue: GigQueue, elastic: ElasticSearchClient, logger: (moduleName: string) => Logger): void {
+export function appRoutes(
+    app: Application,
+    queue: GigQueue,
+    elastic: ElasticSearchClient,
+    logger: (moduleName: string) => Logger
+): void {
     const gigSvc = new GigService(queue, logger);
     const gigController = new GigController(gigSvc, elastic, queue, logger);
     app.use("", healthRoutes());

@@ -26,7 +26,7 @@ export class GigController {
         private queue: GigQueue,
         logger: (moduleName: string) => Logger
     ) {
-        this.redisClient = new GigRedis(logger)
+        this.redisClient = new GigRedis(logger);
     }
 
     async addGig(req: Request, res: Response): Promise<void> {

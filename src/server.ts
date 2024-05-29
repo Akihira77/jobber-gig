@@ -71,7 +71,12 @@ function standardMiddleware(app: Application): void {
     app.use(urlencoded({ extended: true, limit: "200mb" }));
 }
 
-function routesMiddleware(app: Application, queue: GigQueue, elastic: ElasticSearchClient, logger: (moduleName: string) => Logger): void {
+function routesMiddleware(
+    app: Application,
+    queue: GigQueue,
+    elastic: ElasticSearchClient,
+    logger: (moduleName: string) => Logger
+): void {
     appRoutes(app, queue, elastic, logger);
 }
 
@@ -83,7 +88,7 @@ async function startQueues(
     queue.consumeGigDirectMessages();
     queue.consumeSeedDirectMessages();
 
-    return queue
+    return queue;
 }
 
 export async function startElasticSearch(
