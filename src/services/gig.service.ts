@@ -31,13 +31,18 @@ export class GigService {
         this.elastic = new ElasticSearchClient(logger);
     }
 
-    async getGigById(id: string): Promise<ISellerGig> {
+    async getGigByIdElasticDb(id: string): Promise<ISellerGig> {
         const gig = await this.elastic.getIndexedData("gigs", id);
 
         return gig;
     }
 
-    async getSellerActiveGigs(sellerId: string): Promise<ISellerGig[]> {
+    async getGigByIdMongoDb(id: string): Promise<ISellerGig> {
+        const gig = await GigModel.findById(id).exec();
+        return gig?.toJSON() as ISellerGig;
+    }
+
+    async getSellerActiveGigsMongoDb(sellerId: string): Promise<ISellerGig[]> {
         try {
             const results: ISellerGig[] = [];
             const gigs: ISellerGig[] = await GigModel.find({
@@ -55,11 +60,13 @@ export class GigService {
             this.logger(
                 "services/gig.service.ts - getSellerActiveGigs()"
             ).error("GigService getSellerActiveGigs() method error", error);
-            throw new Error("Unexpected error occured. Please try again.");
+            return [];
         }
     }
 
-    async getSellerInactiveGigs(sellerId: string): Promise<ISellerGig[]> {
+    async getSellerInactiveGigsMongoDb(
+        sellerId: string
+    ): Promise<ISellerGig[]> {
         try {
             const results: ISellerGig[] = [];
             const gigs: ISellerGig[] = await GigModel.find({
@@ -77,7 +84,7 @@ export class GigService {
             this.logger(
                 "services/gig.service.ts - getSellerInactiveGigs()"
             ).error("GigService getSellerInactiveGigs() method error", error);
-            throw new Error("Unexpected error occured. Please try again.");
+            return [];
         }
     }
 
@@ -156,6 +163,8 @@ export class GigService {
                 );
             }
 
+            this.elastic.deleteIndexedData("gigs", gigId);
+
             if (result.coverImage.includes("res.cloudinary.com")) {
                 const textPerPath = result.coverImage.split("/");
                 const fileName = textPerPath[textPerPath.length - 1];
@@ -178,7 +187,6 @@ export class GigService {
                 }),
                 "Details sent to users service"
             );
-            await this.elastic.deleteIndexedData("gigs", gigId);
         } catch (error) {
             this.logger("services/gig.service.ts - deleteGig()").error(
                 "GigService deleteGig() method error",
@@ -230,7 +238,7 @@ export class GigService {
                 const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig;
                 await this.elastic.updateIndexedData(
                     "gigs",
-                    updatedGig._id!.toString(),
+                    updatedGig.id,
                     gigOmit_Id
                 );
             }
@@ -295,12 +303,12 @@ export class GigService {
         }
     }
 
-    async updateGigReview(request: IReviewMessageDetails): Promise<void> {
+    async upsertGigReview(request: IReviewMessageDetails): Promise<ISellerGig> {
         try {
             if (!isValidObjectId(request.gigId)) {
                 throw new BadRequestError(
                     "Invalid gig id",
-                    "GigService updateGigReview() method"
+                    "GigService upsertGigReview() method"
                 );
             }
 
@@ -334,9 +342,11 @@ export class GigService {
                     gigOmit_Id
                 );
             }
+
+            return updatedGig;
         } catch (error) {
-            this.logger("services/gig.service.ts - updateGigReview()").error(
-                "GigService updateGigReview() method error",
+            this.logger("services/gig.service.ts - upsertGigReview()").error(
+                "GigService upsertGigReview() method error",
                 error
             );
             if (error instanceof CustomError) {
@@ -347,48 +357,7 @@ export class GigService {
         }
     }
 
-    async findGigsSearchBySellerId(
-        searchQuery: string,
-        active: boolean
-    ): Promise<ISearchResult> {
-        // try it on elasticsearch dev tools
-        const queryList: IQueryList[] = [
-            {
-                query_string: {
-                    fields: ["sellerId"],
-                    query: `*${searchQuery}*`
-                }
-            },
-            {
-                term: {
-                    active
-                }
-            }
-        ];
-
-        try {
-            const result: SearchResponse = await this.elastic.runQuery({
-                index: "gigs",
-                query: {
-                    bool: {
-                        must: queryList
-                    }
-                }
-            });
-
-            const total: IHitsTotal = result.hits.total as IHitsTotal;
-            const hits = result.hits.hits;
-
-            return { total: total.value, hits };
-        } catch (error) {
-            this.logger(
-                "services/gig.service.ts - findGigsSearchBySellerId()"
-            ).error("GigService gigsSearchBySellerId() method error:", error);
-            return { total: 0, hits: [] };
-        }
-    }
-
-    async gigsSearch(
+    async gigsSearchElasticDb(
         searchQuery: string,
         paginate: IPaginateProps,
         min: number,
@@ -453,7 +422,7 @@ export class GigService {
                         sortId: type === "forward" ? "asc" : "desc"
                     }
                 ],
-                // startFrom for pagination
+                // start for pagination
                 ...(from !== "0" && { search_after: [from] })
             });
 
@@ -470,7 +439,9 @@ export class GigService {
         }
     }
 
-    async gigsSearchByCategory(searchQuery: string): Promise<ISearchResult> {
+    async gigsSearchByCategoryElasticDb(
+        searchQuery: string
+    ): Promise<ISearchResult> {
         try {
             const result: SearchResponse = await this.elastic.runQuery({
                 index: "gigs",
@@ -506,7 +477,7 @@ export class GigService {
         }
     }
 
-    async getMoreGigsLikeThis(gigId: string): Promise<ISearchResult> {
+    async getMoreGigsLikeThisElasticDb(gigId: string): Promise<ISearchResult> {
         try {
             const result: SearchResponse = await this.elastic.runQuery({
                 index: "gigs",
@@ -545,7 +516,7 @@ export class GigService {
         }
     }
 
-    async getTopRatedGigsByCategory(
+    async getTopRatedGigsByCategoryElasticDb(
         searchQuery: string
     ): Promise<ISearchResult> {
         try {

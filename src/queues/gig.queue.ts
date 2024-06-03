@@ -67,7 +67,7 @@ export class GigQueue {
                         );
 
                         if (type === "updateGigReview") {
-                            await this.gigService.updateGigReview(gigReview);
+                            await this.gigService.upsertGigReview(gigReview);
                             this.ch!.ack(msg!);
                             return;
                         }

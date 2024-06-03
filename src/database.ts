@@ -8,10 +8,6 @@ export const databaseConnection = async (
     try {
         // console.log(DATABASE_URL);
         const db = await mongoose.connect(`${DATABASE_URL}`);
-        logger("database.ts - databaseConnection()").info(
-            "GigService MongoDB is connected."
-        );
-
         return db;
     } catch (error) {
         logger("database.ts - databaseConnection()").error(

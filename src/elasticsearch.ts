@@ -101,7 +101,7 @@ export class ElasticSearchClient {
         try {
             const result = await this.client.get({ index, id: itemId });
 
-            return result?._source as ISellerGig;
+            return result._source as ISellerGig;
         } catch (error) {
             this.logger("elasticsearch.ts - getIndexedData()").error(
                 "GigService elasticsearch getIndexedData() method error:",

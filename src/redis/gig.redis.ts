@@ -1,9 +1,9 @@
 import { REDIS_HOST } from "@gig/config";
-import { createClient } from "redis";
+import { createClient, RedisClientType } from "redis";
 import { Logger } from "winston";
 
 export class GigRedis {
-    private redisClient: ReturnType<typeof createClient>;
+    private redisClient: RedisClientType;
     constructor(private logger: (moduleName: string) => Logger) {
         this.redisClient = createClient({
             url: `${REDIS_HOST}`,
@@ -23,6 +23,7 @@ export class GigRedis {
                 );
             }
             this.catchError();
+            this.closeConnection(this.redisClient);
         } catch (error) {
             this.logger("redis/redis.connection() - redisConnect()").error(
                 "GigService redisConnect() method error:",
@@ -56,6 +57,12 @@ export class GigRedis {
             this.logger("redis/redis.connection() - redisConnect()").error(
                 error
             );
+        });
+    }
+
+    closeConnection(redis: RedisClientType): void {
+        process.once("exit", async () => {
+            await redis.quit();
         });
     }
 }

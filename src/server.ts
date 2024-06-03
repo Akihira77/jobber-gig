@@ -1,78 +1,118 @@
-import http from "http";
-import "express-async-errors";
-
-import compression from "compression";
 import jwt from "jsonwebtoken";
 import {
     CustomError,
     IAuthPayload,
-    IErrorResponse
+    NotAuthorizedError
 } from "@Akihira77/jobber-shared";
 import { API_GATEWAY_URL, JWT_TOKEN, PORT } from "@gig/config";
-import {
-    Application,
-    NextFunction,
-    Request,
-    Response,
-    json,
-    urlencoded
-} from "express";
-import hpp from "hpp";
-import helmet from "helmet";
-import cors from "cors";
 import { ElasticSearchClient } from "@gig/elasticsearch";
 import { appRoutes } from "@gig/routes";
 import { Channel } from "amqplib";
 import { Logger } from "winston";
+import { Context, Hono, Next } from "hono";
+import { cors } from "hono/cors";
+import { compress } from "hono/compress";
+import { timeout } from "hono/timeout";
+import { csrf } from "hono/csrf";
+import { secureHeaders } from "hono/secure-headers";
+import { bodyLimit } from "hono/body-limit";
+import { rateLimiter } from "hono-rate-limiter";
+import { HTTPException } from "hono/http-exception";
+import { StatusCodes } from "http-status-codes";
+import { StatusCode } from "hono/utils/http-status";
+import { serve } from "@hono/node-server";
+
 import { GigQueue } from "./queues/gig.queue";
 
 export let gigChannel: Channel;
+const LIMIT_TIMEOUT = 2 * 1000; // 2s
 
 export async function start(
-    app: Application,
+    app: Hono,
     logger: (moduleName: string) => Logger
 ): Promise<void> {
     const queue = await startQueues(logger);
     const elastic = await startElasticSearch(logger);
+    gigErrorHandler(app);
     securityMiddleware(app);
     standardMiddleware(app);
-    gigErrorHandler(app, logger);
     routesMiddleware(app, queue, elastic, logger);
     startServer(app, logger);
 }
 
-function securityMiddleware(app: Application): void {
-    app.set("trust proxy", 1);
-    app.use(hpp());
-    app.use(helmet());
+function securityMiddleware(app: Hono): void {
+    app.use(
+        timeout(LIMIT_TIMEOUT, () => {
+            return new HTTPException(StatusCodes.REQUEST_TIMEOUT, {
+                message: `Request timeout after waiting ${LIMIT_TIMEOUT}ms. Please try again later.`
+            });
+        })
+    );
+    app.use(secureHeaders());
+    app.use(csrf());
     app.use(
         cors({
             origin: [`${API_GATEWAY_URL}`],
             credentials: true,
-            methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+            allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
         })
     );
 
-    app.use((req: Request, _res: Response, next: NextFunction) => {
-        // console.logger(req.headers);
-        if (req.headers.authorization) {
-            const token = req.headers.authorization.split(" ")[1];
-            const payload = jwt.verify(token, JWT_TOKEN!) as IAuthPayload;
-
-            req.currentUser = payload;
+    app.use(async (c: Context, next: Next) => {
+        if (c.req.path == "/gig-health") {
+            await next();
+            return;
         }
-        next();
+
+        const authorization = c.req.header("authorization");
+        if (!authorization || authorization === "") {
+            throw new NotAuthorizedError(
+                "unauthenticated request",
+                "Gig Service"
+            );
+        }
+
+        const token = authorization.split(" ")[1];
+        const payload = jwt.verify(token, JWT_TOKEN!) as IAuthPayload;
+
+        c.set("currentUser", payload);
+        await next();
     });
 }
 
-function standardMiddleware(app: Application): void {
-    app.use(compression());
-    app.use(json({ limit: "200mb" }));
-    app.use(urlencoded({ extended: true, limit: "200mb" }));
+function standardMiddleware(app: Hono): void {
+    app.use(compress());
+    app.use(
+        bodyLimit({
+            maxSize: 2 * 100 * 1000 * 1024, //200mb
+            onError(c: Context) {
+                return c.text(
+                    "Your request is too big",
+                    StatusCodes.REQUEST_HEADER_FIELDS_TOO_LARGE
+                );
+            }
+        })
+    );
+
+    const generateRandomNumber = (length: number): number => {
+        return (
+            Math.floor(Math.random() * (9 * Math.pow(10, length - 1))) +
+            Math.pow(10, length - 1)
+        );
+    };
+
+    app.use(
+        rateLimiter({
+            windowMs: 1 * 60 * 1000, //60s
+            limit: 10,
+            standardHeaders: "draft-6",
+            keyGenerator: () => generateRandomNumber(12).toString()
+        })
+    );
 }
 
 function routesMiddleware(
-    app: Application,
+    app: Hono,
     queue: GigQueue,
     elastic: ElasticSearchClient,
     logger: (moduleName: string) => Logger
@@ -101,43 +141,38 @@ export async function startElasticSearch(
     return elastic;
 }
 
-function gigErrorHandler(
-    app: Application,
-    logger: (moduleName: string) => Logger
-): void {
-    app.use(
-        (
-            error: IErrorResponse,
-            _req: Request,
-            res: Response,
-            next: NextFunction
-        ) => {
-            logger("server.ts - gigErrorHandler()").error(
-                `GigService ${error.comingFrom}:`,
-                error
-            );
+function gigErrorHandler(app: Hono): void {
+    app.notFound((c) => {
+        return c.text("Route path is not found", StatusCodes.NOT_FOUND);
+    });
 
-            if (error instanceof CustomError) {
-                res.status(error.statusCode).json(error.serializeErrors());
-            }
-            next();
+    app.onError((err: Error, c: Context) => {
+        if (err instanceof CustomError) {
+            return c.json(
+                err.serializeErrors(),
+                (err.statusCode as StatusCode) ??
+                    StatusCodes.INTERNAL_SERVER_ERROR
+            );
+        } else if (err instanceof HTTPException) {
+            return err.getResponse();
         }
-    );
+
+        return c.text(
+            "Unexpected error occured. Please try again",
+            StatusCodes.INTERNAL_SERVER_ERROR
+        );
+    });
 }
 
-function startServer(
-    app: Application,
-    logger: (moduleName: string) => Logger
-): void {
+function startServer(app: Hono, logger: (moduleName: string) => Logger): void {
     try {
-        const httpServer: http.Server = new http.Server(app);
         logger("server.ts - startServer()").info(
             `GigService has started with pid ${process.pid}`
         );
 
-        httpServer.listen(Number(PORT), () => {
+        serve({ fetch: app.fetch, port: Number(PORT) }, (info) => {
             logger("server.ts - startServer()").info(
-                `GigService running on port ${PORT}`
+                `GigService running on port ${info.port}`
             );
         });
     } catch (error) {

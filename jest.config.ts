@@ -25,7 +25,9 @@ const config: Config.InitialOptions = {
     coverageReporters: ["text-summary", "lcov"],
     moduleNameMapper: {
         "@gig/(.*)": ["<rootDir>/src/$1"]
-    }
+    },
+    // silent: true,
+    // noStackTrace: true,
 };
 
 export default config;
