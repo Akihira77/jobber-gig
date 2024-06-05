@@ -26,9 +26,9 @@ export function appRoutes(
     const gigController = new GigHandler(gigSvc, elastic, queue, logger);
 
     const api = app.basePath(BASE_PATH);
-    api.use(verifyGatewayRequest);
 
     gigRoute(api, gigController);
+    api.use(verifyGatewayRequest);
 }
 
 function gigRoute(
