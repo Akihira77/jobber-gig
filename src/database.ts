@@ -1,19 +1,12 @@
-import { DATABASE_URL } from "@gig/config";
-import mongoose, { Mongoose } from "mongoose";
-import { Logger } from "winston";
+import { DATABASE_URL } from "@gig/config"
+import mongoose, { Mongoose } from "mongoose"
 
-export const databaseConnection = async (
-    logger: (moduleName?: string) => Logger
-): Promise<Mongoose> => {
+export const databaseConnection = async (): Promise<Mongoose> => {
     try {
-        // console.log(DATABASE_URL);
-        const db = await mongoose.connect(`${DATABASE_URL}`);
-        return db;
+        const db = await mongoose.connect(`${DATABASE_URL}`)
+        return db
     } catch (error) {
-        logger("database.ts - databaseConnection()").error(
-            "GigService databaseConnection() method error:",
-            error
-        );
-        process.exit(1);
+        console.log(error)
+        throw error
     }
-};
+}

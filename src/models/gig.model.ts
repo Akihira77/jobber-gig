@@ -1,5 +1,5 @@
-import { ISellerGig } from "@Akihira77/jobber-shared";
-import { Model, model, Schema, Document } from "mongoose";
+import { ISellerGig } from "@Akihira77/jobber-shared"
+import { Model, model, Schema, Document } from "mongoose"
 
 const gigSchema = new Schema(
     {
@@ -49,20 +49,20 @@ const gigSchema = new Schema(
         versionKey: false,
         toJSON: {
             transform(_doc: Document, rec: Record<string, Document>) {
-                rec.id = rec._id;
-                delete rec._id;
-                return rec;
+                rec.id = rec._id
+                delete rec._id
+                return rec
             }
         }
     }
-);
+)
 
 gigSchema.virtual("id").get(function () {
-    return this._id;
-});
+    return this._id
+})
 
 export const GigModel: Model<ISellerGig> = model<ISellerGig>(
     "Gig",
     gigSchema,
     "Gig"
-);
+)

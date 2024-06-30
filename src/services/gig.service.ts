@@ -10,57 +10,57 @@ import {
     ISellerDocument,
     ISellerGig,
     NotFoundError
-} from "@Akihira77/jobber-shared";
-import { faker } from "@faker-js/faker";
-import { exchangeNamesAndRoutingKeys } from "@gig/config";
-import { GigModel } from "@gig/models/gig.model";
-import { sample } from "lodash";
-import cloudinary from "cloudinary";
-import { Logger } from "winston";
-import { isValidObjectId } from "mongoose";
-import { SearchResponse } from "@elastic/elasticsearch/lib/api/types";
-import { ElasticSearchClient } from "@gig/elasticsearch";
-import { GigQueue } from "@gig/queues/gig.queue";
+} from "@Akihira77/jobber-shared"
+import { faker } from "@faker-js/faker"
+import { exchangeNamesAndRoutingKeys } from "@gig/config"
+import { GigModel } from "@gig/models/gig.model"
+import { sample } from "lodash"
+import cloudinary from "cloudinary"
+import { Logger } from "winston"
+import { isValidObjectId } from "mongoose"
+import { SearchResponse } from "@elastic/elasticsearch/lib/api/types"
+import { ElasticSearchClient } from "@gig/elasticsearch"
+import { GigQueue } from "@gig/queues/gig.queue"
 
 export class GigService {
-    private elastic: ElasticSearchClient;
+    private elastic: ElasticSearchClient
     constructor(
         private queue: GigQueue,
         private logger: (moduleName: string) => Logger
     ) {
-        this.elastic = new ElasticSearchClient(logger);
+        this.elastic = new ElasticSearchClient(logger)
     }
 
     async getGigByIdElasticDb(id: string): Promise<ISellerGig> {
-        const gig = await this.elastic.getIndexedData("gigs", id);
+        const gig = await this.elastic.getIndexedData("gigs", id)
 
-        return gig;
+        return gig
     }
 
     async getGigByIdMongoDb(id: string): Promise<ISellerGig> {
-        const gig = await GigModel.findById(id).exec();
-        return gig?.toJSON() as ISellerGig;
+        const gig = await GigModel.findById(id).exec()
+        return gig?.toJSON() as ISellerGig
     }
 
     async getSellerActiveGigsMongoDb(sellerId: string): Promise<ISellerGig[]> {
         try {
-            const results: ISellerGig[] = [];
+            const results: ISellerGig[] = []
             const gigs: ISellerGig[] = await GigModel.find({
                 sellerId,
                 active: true
-            }).exec();
+            }).exec()
 
             gigs.forEach((gig) => {
-                const gigOmit_Id = gig.toJSON?.() as ISellerGig;
-                results.push(gigOmit_Id);
-            });
+                const gigOmit_Id = gig.toJSON?.() as ISellerGig
+                results.push(gigOmit_Id)
+            })
 
-            return results;
+            return results
         } catch (error) {
             this.logger(
                 "services/gig.service.ts - getSellerActiveGigs()"
-            ).error("GigService getSellerActiveGigs() method error", error);
-            return [];
+            ).error("GigService getSellerActiveGigs() method error", error)
+            return []
         }
     }
 
@@ -68,29 +68,29 @@ export class GigService {
         sellerId: string
     ): Promise<ISellerGig[]> {
         try {
-            const results: ISellerGig[] = [];
+            const results: ISellerGig[] = []
             const gigs: ISellerGig[] = await GigModel.find({
                 sellerId,
                 active: false
-            }).exec();
+            }).exec()
 
             gigs.forEach((gig) => {
-                const gigOmit_Id = gig.toJSON?.() as ISellerGig;
-                results.push(gigOmit_Id);
-            });
+                const gigOmit_Id = gig.toJSON?.() as ISellerGig
+                results.push(gigOmit_Id)
+            })
 
-            return results;
+            return results
         } catch (error) {
             this.logger(
                 "services/gig.service.ts - getSellerInactiveGigs()"
-            ).error("GigService getSellerInactiveGigs() method error", error);
-            return [];
+            ).error("GigService getSellerInactiveGigs() method error", error)
+            return []
         }
     }
 
     async createGig(request: ISellerGig): Promise<ISellerGig> {
         try {
-            const { expectedDelivery } = request;
+            const { expectedDelivery } = request
             if (
                 !(
                     expectedDelivery.includes("Day Delivery") ||
@@ -100,14 +100,14 @@ export class GigService {
                 throw new BadRequestError(
                     "Error expected delivery field is incorrect value",
                     "GigService createGig() method"
-                );
+                )
             }
 
-            const createdGig = await GigModel.create(request);
+            const createdGig = await GigModel.create(request)
 
             if (createdGig) {
-                const gigOmit_Id = createdGig.toJSON?.() as ISellerGig;
-                const { usersService } = exchangeNamesAndRoutingKeys;
+                const gigOmit_Id = createdGig.toJSON?.() as ISellerGig
+                const { usersService } = exchangeNamesAndRoutingKeys
 
                 await this.queue.publishDirectMessage(
                     usersService.seller.exchangeName,
@@ -118,25 +118,25 @@ export class GigService {
                         count: 1
                     }),
                     "Details sent to users service"
-                );
+                )
                 await this.elastic.addDataToIndex(
                     "gigs",
                     createdGig._id.toString(),
                     gigOmit_Id
-                );
+                )
             }
 
-            return createdGig;
+            return createdGig
         } catch (error) {
             this.logger("services/gig.service.ts - createGig()").error(
                 "GigService createGig() method error",
                 error
-            );
+            )
             if (error instanceof CustomError) {
-                throw error;
+                throw error
             }
 
-            throw new Error("Unexpected error occured. Please try again.");
+            throw new Error("Unexpected error occured. Please try again.")
         }
     }
 
@@ -146,7 +146,7 @@ export class GigService {
                 throw new BadRequestError(
                     "Invalid gig id",
                     "GigService deleteGig() method"
-                );
+                )
             }
 
             const result = await GigModel.findOneAndDelete({
@@ -154,28 +154,28 @@ export class GigService {
                 sellerId
             })
                 .lean()
-                .exec();
+                .exec()
 
             if (!result) {
                 throw new NotFoundError(
                     "Gig is not found",
                     "GigService deleteGig() method"
-                );
+                )
             }
 
-            this.elastic.deleteIndexedData("gigs", gigId);
+            this.elastic.deleteIndexedData("gigs", gigId)
 
             if (result.coverImage.includes("res.cloudinary.com")) {
-                const textPerPath = result.coverImage.split("/");
-                const fileName = textPerPath[textPerPath.length - 1];
-                const public_id = fileName.slice(0, fileName.indexOf("."));
+                const textPerPath = result.coverImage.split("/")
+                const fileName = textPerPath[textPerPath.length - 1]
+                const public_id = fileName.slice(0, fileName.indexOf("."))
 
                 cloudinary.v2.uploader.destroy(public_id, {
                     resource_type: "image"
-                });
+                })
             }
 
-            const { usersService } = exchangeNamesAndRoutingKeys;
+            const { usersService } = exchangeNamesAndRoutingKeys
 
             await this.queue.publishDirectMessage(
                 usersService.seller.exchangeName,
@@ -186,18 +186,18 @@ export class GigService {
                     count: -1
                 }),
                 "Details sent to users service"
-            );
+            )
         } catch (error) {
             this.logger("services/gig.service.ts - deleteGig()").error(
                 "GigService deleteGig() method error",
                 error
-            );
+            )
 
             if (error instanceof CustomError) {
-                throw error;
+                throw error
             }
 
-            throw new Error("Unexpected error occured. Please try again.");
+            throw new Error("Unexpected error occured. Please try again.")
         }
     }
 
@@ -210,7 +210,7 @@ export class GigService {
                 throw new BadRequestError(
                     "Invalid gig id",
                     "GigService updateGig() method"
-                );
+                )
             }
 
             const updatedGig = await GigModel.findOneAndUpdate(
@@ -232,28 +232,28 @@ export class GigService {
                 {
                     new: true
                 }
-            ).exec();
+            ).exec()
 
             if (updatedGig) {
-                const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig;
+                const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig
                 await this.elastic.updateIndexedData(
                     "gigs",
                     updatedGig.id,
                     gigOmit_Id
-                );
+                )
             }
 
-            return updatedGig;
+            return updatedGig
         } catch (error) {
             this.logger("services/gig.service.ts - updateGig()").error(
                 "GigService updateGig() method error",
                 error
-            );
+            )
             if (error instanceof CustomError) {
-                throw error;
+                throw error
             }
 
-            throw new Error("Unexpected error occured. Please try again.");
+            throw new Error("Unexpected error occured. Please try again.")
         }
     }
 
@@ -266,7 +266,7 @@ export class GigService {
                 throw new BadRequestError(
                     "Invalid gig id",
                     "GigService updateActiveGigProp() method"
-                );
+                )
             }
 
             const updatedGig = await GigModel.findOneAndUpdate(
@@ -279,27 +279,27 @@ export class GigService {
                 {
                     new: true
                 }
-            ).exec();
+            ).exec()
 
             if (updatedGig) {
-                const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig;
+                const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig
                 await this.elastic.updateIndexedData(
                     "gigs",
                     gigOmit_Id.id!.toString(),
                     gigOmit_Id
-                );
+                )
             }
 
-            return updatedGig;
+            return updatedGig
         } catch (error) {
             this.logger(
                 "services/gig.service.ts - updateActiveGigProp()"
-            ).error("GigService updateActiveGigProp() method error", error);
+            ).error("GigService updateActiveGigProp() method error", error)
             if (error instanceof CustomError) {
-                throw error;
+                throw error
             }
 
-            throw new Error("Unexpected error occured. Please try again.");
+            throw new Error("Unexpected error occured. Please try again.")
         }
     }
 
@@ -309,7 +309,7 @@ export class GigService {
                 throw new BadRequestError(
                     "Invalid gig id",
                     "GigService upsertGigReview() method"
-                );
+                )
             }
 
             const ratingTypes: IRatingTypes = {
@@ -318,8 +318,8 @@ export class GigService {
                 "3": "three",
                 "4": "four",
                 "5": "five"
-            };
-            const ratingKey: string = ratingTypes[`${request.rating}`];
+            }
+            const ratingKey: string = ratingTypes[`${request.rating}`]
 
             const updatedGig = await GigModel.findOneAndUpdate(
                 { _id: request.gigId, sellerId: request.sellerId },
@@ -332,28 +332,28 @@ export class GigService {
                     }
                 },
                 { new: true, upsert: true }
-            ).exec();
+            ).exec()
 
             if (updatedGig) {
-                const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig;
+                const gigOmit_Id = updatedGig.toJSON?.() as ISellerGig
                 await this.elastic.updateIndexedData(
                     "gigs",
                     updatedGig._id!.toString(),
                     gigOmit_Id
-                );
+                )
             }
 
-            return updatedGig;
+            return updatedGig
         } catch (error) {
             this.logger("services/gig.service.ts - upsertGigReview()").error(
                 "GigService upsertGigReview() method error",
                 error
-            );
+            )
             if (error instanceof CustomError) {
-                throw error;
+                throw error
             }
 
-            throw new Error("Unexpected error occured. Please try again.");
+            throw new Error("Unexpected error occured. Please try again.")
         }
     }
 
@@ -364,7 +364,7 @@ export class GigService {
         max: number,
         deliveryTime?: string
     ): Promise<ISearchResult> {
-        const { from, size, type } = paginate;
+        const { from, size, type } = paginate
         // try it on elasticsearch dev tools
         const queryList: IQueryList[] = [
             {
@@ -387,14 +387,17 @@ export class GigService {
                     active: true
                 }
             }
-        ];
+        ]
 
         if (deliveryTime && deliveryTime !== "undefined") {
             queryList.push({
-                match_phrase: {
-                    expectedDelivery: deliveryTime
+                range: {
+                    expectedDelivery: {
+                        gte: "0 Days Delivery",
+                        lte: deliveryTime
+                    }
                 }
-            } as any);
+            } as any)
         }
 
         if (!isNaN(min) && !isNaN(max)) {
@@ -405,7 +408,7 @@ export class GigService {
                         lte: max
                     }
                 }
-            });
+            })
         }
 
         try {
@@ -424,18 +427,18 @@ export class GigService {
                 ],
                 // start for pagination
                 ...(from !== "0" && { search_after: [from] })
-            });
+            })
 
-            const total: IHitsTotal = result.hits.total as IHitsTotal;
-            const hits = result.hits.hits;
+            const total: IHitsTotal = result.hits.total as IHitsTotal
+            const hits = result.hits.hits
 
-            return { total: total.value, hits };
+            return { total: total.value, hits }
         } catch (error) {
             this.logger("services/gig.service.ts - gigsSearch()").error(
                 "GigService gigsSearch() method error:",
                 error
-            );
-            return { total: 0, hits: [] };
+            )
+            return { total: 0, hits: [] }
         }
     }
 
@@ -463,17 +466,17 @@ export class GigService {
                         ]
                     }
                 }
-            });
+            })
 
-            const total: IHitsTotal = result.hits.total as IHitsTotal;
-            const hits = result.hits.hits;
+            const total: IHitsTotal = result.hits.total as IHitsTotal
+            const hits = result.hits.hits
 
-            return { total: total.value, hits };
+            return { total: total.value, hits }
         } catch (error) {
             this.logger(
                 "services/gig.service.ts - gigsSearchByCategory()"
-            ).error("GigService gigsSearchByCategory() method error:", error);
-            return { total: 0, hits: [] };
+            ).error("GigService gigsSearchByCategory() method error:", error)
+            return { total: 0, hits: [] }
         }
     }
 
@@ -502,17 +505,17 @@ export class GigService {
                         ]
                     }
                 }
-            });
+            })
 
-            const total: IHitsTotal = result.hits.total as IHitsTotal;
-            const hits = result.hits.hits;
+            const total: IHitsTotal = result.hits.total as IHitsTotal
+            const hits = result.hits.hits
 
-            return { total: total.value, hits };
+            return { total: total.value, hits }
         } catch (error) {
             this.logger(
                 "services/gig.service.ts - getMoreGigsLikeThis()"
-            ).error("GigService getMoreGigsLikeThis() method error:", error);
-            return { total: 0, hits: [] };
+            ).error("GigService getMoreGigsLikeThis() method error:", error)
+            return { total: 0, hits: [] }
         }
     }
 
@@ -546,20 +549,20 @@ export class GigService {
                         ]
                     }
                 }
-            });
+            })
 
-            const total: IHitsTotal = result.hits.total as IHitsTotal;
-            const hits = result.hits.hits;
+            const total: IHitsTotal = result.hits.total as IHitsTotal
+            const hits = result.hits.hits
 
-            return { total: total.value, hits };
+            return { total: total.value, hits }
         } catch (error) {
             this.logger(
                 "services/gig.service.ts - getTopRatedGigsByCategory()"
             ).error(
                 "GigService getTopRatedGigsByCategory() method error:",
                 error
-            );
-            return { total: 0, hits: [] };
+            )
+            return { total: 0, hits: [] }
         }
     }
 
@@ -573,7 +576,7 @@ export class GigService {
             "Programming & Tech",
             "Data",
             "Business"
-        ];
+        ]
 
         const expectedDeliveries: string[] = [
             "1 Day Delivery",
@@ -581,7 +584,7 @@ export class GigService {
             "3 Days Delivery",
             "4 Days Delivery",
             "5 Days Delivery"
-        ];
+        ]
 
         const randomRatings = [
             { sum: 20, count: 4 },
@@ -589,15 +592,15 @@ export class GigService {
             { sum: 15, count: 3 },
             { sum: 20, count: 5 },
             { sum: 5, count: 1 }
-        ];
+        ]
 
         for (let i = 0; i < parseInt(count); i++) {
             const sellerDoc: ISellerDocument =
-                sellers[Math.floor(Math.random() * (sellers.length - 1))];
-            const title = `I will ${faker.word.words(5)}`;
-            const basicTitle = faker.commerce.productName();
-            const basicDescription = faker.commerce.productDescription();
-            const rating = sample(randomRatings);
+                sellers[Math.floor(Math.random() * (sellers.length - 1))]
+            const title = `I will ${faker.word.words(5)}`
+            const basicTitle = faker.commerce.productName()
+            const basicDescription = faker.commerce.productDescription()
+            const rating = sample(randomRatings)
             const gig: ISellerGig = {
                 profilePicture: sellerDoc.profilePicture,
                 sellerId: sellerDoc._id,
@@ -633,10 +636,10 @@ export class GigService {
                 sortId: parseInt(count) + i + 1,
                 ratingsCount: (i + 1) % 4 === 0 ? rating!.count : 0,
                 ratingSum: (i + 1) % 4 === 0 ? rating!.sum : 0
-            };
+            }
 
-            console.log(`***SEEDING GIG*** - ${i + 1} of ${count}`);
-            this.createGig(gig);
+            console.log(`***SEEDING GIG*** - ${i + 1} of ${count}`)
+            this.createGig(gig)
         }
     }
 }

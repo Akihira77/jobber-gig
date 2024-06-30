@@ -1,17 +1,17 @@
-import { Logger } from "winston";
-import { Context, Hono, Next } from "hono";
-import { NotAuthorizedError } from "@Akihira77/jobber-shared";
-import jwt from "jsonwebtoken";
-import { StatusCodes } from "http-status-codes";
+import { Logger } from "winston"
+import { Context, Hono, Next } from "hono"
+import { NotAuthorizedError, type IAuthPayload } from "@Akihira77/jobber-shared"
+import jwt from "jsonwebtoken"
+import { StatusCodes } from "http-status-codes"
 
-import { GigQueue } from "./queues/gig.queue";
-import { GigService } from "./services/gig.service";
-import { GigHandler } from "./handler/gig.handler";
-import { ElasticSearchClient } from "./elasticsearch";
-import { GATEWAY_JWT_TOKEN } from "./config";
+import { GigQueue } from "./queues/gig.queue"
+import { GigService } from "./services/gig.service"
+import { GigHandler } from "./handler/gig.handler"
+import { ElasticSearchClient } from "./elasticsearch"
+import { GATEWAY_JWT_TOKEN } from "./config"
 
-const BASE_PATH = "/api/v1/gig";
-
+// const BASE_PATH = "/api/v1/gig";
+const BASE_PATH = "/gig"
 export function appRoutes(
     app: Hono,
     queue: GigQueue,
@@ -19,16 +19,18 @@ export function appRoutes(
     logger: (moduleName: string) => Logger
 ): void {
     app.get("gig-health", (c: Context) => {
-        return c.text("Gig service is healthy and OK.", StatusCodes.OK);
-    });
+        return c.text("Gig service is healthy and OK.", StatusCodes.OK)
+    })
 
-    const gigSvc = new GigService(queue, logger);
-    const gigController = new GigHandler(gigSvc, elastic, queue, logger);
+    const gigSvc = new GigService(queue, logger)
+    const gigController = new GigHandler(gigSvc, elastic, queue, logger)
 
-    const api = app.basePath(BASE_PATH);
+    const api = app.basePath(BASE_PATH)
+    // api.use(verifyGatewayRequest, authOnly);
 
-    gigRoute(api, gigController);
-    api.use(verifyGatewayRequest);
+    api.use(authOnly)
+    gigRoute(api, gigController)
+    api.use(verifyGatewayRequest)
 }
 
 function gigRoute(
@@ -36,21 +38,20 @@ function gigRoute(
     gigHndlr: GigHandler
 ): void {
     api.get("/:gigId", async (c: Context) => {
-        const gigId = c.req.param("gigId");
-        const gig = await gigHndlr.getGigById.bind(gigHndlr)(gigId);
+        const gigId = c.req.param("gigId")
+        const gig = await gigHndlr.getGigById.bind(gigHndlr)(gigId)
 
         return c.json(
             {
                 message: "Get gig by id",
                 gig
             },
-            StatusCodes.OK
-        );
-    });
+            Object.keys(gig).length > 0 ? StatusCodes.OK : StatusCodes.NOT_FOUND
+        )
+    })
     api.get("/seller/:sellerId", async (c: Context) => {
-        const sellerId = c.req.param("sellerId");
-        const gigs =
-            await gigHndlr.getSellerActiveGigs.bind(gigHndlr)(sellerId);
+        const sellerId = c.req.param("sellerId")
+        const gigs = await gigHndlr.getSellerActiveGigs.bind(gigHndlr)(sellerId)
 
         return c.json(
             {
@@ -58,12 +59,12 @@ function gigRoute(
                 gigs
             },
             StatusCodes.OK
-        );
-    });
+        )
+    })
     api.get("/seller/inactive/:sellerId", async (c: Context) => {
-        const sellerId = c.req.param("sellerId");
+        const sellerId = c.req.param("sellerId")
         const gigs =
-            await gigHndlr.getSellerInactiveGigs.bind(gigHndlr)(sellerId);
+            await gigHndlr.getSellerInactiveGigs.bind(gigHndlr)(sellerId)
 
         return c.json(
             {
@@ -71,11 +72,11 @@ function gigRoute(
                 gigs
             },
             StatusCodes.OK
-        );
-    });
+        )
+    })
     api.get("/search/:from/:size/:type", async (c: Context) => {
-        const { from, size, type } = c.req.param();
-        const { query, delivery_time, min, max } = c.req.query();
+        const { from, size, type } = c.req.param()
+        const { query, delivery_time, min, max } = c.req.query()
 
         const { resultHits, total } = await gigHndlr.getGigsQuerySearch.bind(
             gigHndlr
@@ -85,7 +86,7 @@ function gigRoute(
             delivery_time,
             parseInt(min, 10),
             parseInt(max, 10)
-        );
+        )
 
         return c.json(
             {
@@ -94,25 +95,26 @@ function gigRoute(
                 gigs: resultHits
             },
             StatusCodes.OK
-        );
-    });
+        )
+    })
     api.get("/category/:username", async (c: Context) => {
-        const username = c.req.param("username");
-        const gigs = await gigHndlr.getGigsByCategory.bind(gigHndlr)(username);
+        const username = c.req.param("username")
+        const { resultHits, total } =
+            await gigHndlr.getGigsByCategory.bind(gigHndlr)(username)
 
         return c.json(
             {
                 message: "Search gigs category results",
-                total: gigs.total,
-                gigs
+                total: total,
+                gigs: resultHits
             },
             StatusCodes.OK
-        );
-    });
+        )
+    })
     api.get("/top/:username", async (c: Context) => {
-        const username = c.req.param("username");
+        const username = c.req.param("username")
         const gigs =
-            await gigHndlr.getTopRatedGigsByCategory.bind(gigHndlr)(username);
+            await gigHndlr.getTopRatedGigsByCategory.bind(gigHndlr)(username)
 
         return c.json(
             {
@@ -121,11 +123,11 @@ function gigRoute(
                 gigs
             },
             StatusCodes.OK
-        );
-    });
+        )
+    })
     api.get("/similar/:gigId", async (c: Context) => {
-        const gigId = c.req.param("gigId");
-        const gigs = await gigHndlr.getGigsMoreLikeThis.bind(gigHndlr)(gigId);
+        const gigId = c.req.param("gigId")
+        const gigs = await gigHndlr.getGigsMoreLikeThis.bind(gigHndlr)(gigId)
 
         return c.json(
             {
@@ -134,15 +136,15 @@ function gigRoute(
                 gigs
             },
             StatusCodes.OK
-        );
-    });
+        )
+    })
     api.post("/create", async (c: Context) => {
-        const jsonBody = await c.req.json();
-        const currUser = c.get("currentUser");
+        const jsonBody = await c.req.json()
+        const currUser = c.get("currentUser")
         const createdGig = await gigHndlr.addGig.bind(gigHndlr)(
             jsonBody,
             currUser
-        );
+        )
 
         return c.json(
             {
@@ -150,12 +152,32 @@ function gigRoute(
                 gig: createdGig
             },
             StatusCodes.CREATED
-        );
-    });
+        )
+    })
     api.put("/update/:gigId", async (c: Context) => {
-        const gigId = c.req.param("gigId");
-        const jsonBody = await c.req.json();
-        const gig = await gigHndlr.updateGig.bind(gigHndlr)(gigId, jsonBody);
+        const gigId = c.req.param("gigId")
+        const currUser = c.get("currentUser") as IAuthPayload
+        const gigFromDb = await gigHndlr.getGigById.bind(gigHndlr)(gigId)
+
+        if (Object.keys(gigFromDb).length <= 0) {
+            return c.json(
+                {
+                    message: "Gig did not found.",
+                    gig: gigFromDb
+                },
+                StatusCodes.NOT_FOUND
+            )
+        } else if (gigFromDb.username !== currUser.username) {
+            return c.json(
+                {
+                    message: "Can't update this gig."
+                },
+                StatusCodes.FORBIDDEN
+            )
+        }
+
+        const jsonBody = await c.req.json()
+        const gig = await gigHndlr.updateGig.bind(gigHndlr)(gigId, jsonBody)
 
         return c.json(
             {
@@ -163,15 +185,35 @@ function gigRoute(
                 gig
             },
             StatusCodes.OK
-        );
-    });
+        )
+    })
     api.put("/status/:gigId", async (c: Context) => {
-        const gigId = c.req.param("gigId");
-        const { active } = await c.req.json();
+        const gigId = c.req.param("gigId")
+        const currUser = c.get("currentUser") as IAuthPayload
+        const gigFromDb = await gigHndlr.getGigById.bind(gigHndlr)(gigId)
+
+        if (Object.keys(gigFromDb).length <= 0) {
+            return c.json(
+                {
+                    message: "Gig did not found.",
+                    gig: gigFromDb
+                },
+                StatusCodes.NOT_FOUND
+            )
+        } else if (gigFromDb.username !== currUser.username) {
+            return c.json(
+                {
+                    message: "Can't update this gig."
+                },
+                StatusCodes.FORBIDDEN
+            )
+        }
+
+        const { active } = await c.req.json()
         const gig = await gigHndlr.updateActiveStatusGig.bind(gigHndlr)(
             gigId,
             active
-        );
+        )
 
         return c.json(
             {
@@ -179,23 +221,23 @@ function gigRoute(
                 gig
             },
             StatusCodes.OK
-        );
-    });
+        )
+    })
     api.delete("/:gigId/:sellerId", async (c: Context) => {
-        const { gigId, sellerId } = c.req.param();
-        await gigHndlr.removeGig.bind(gigHndlr)(gigId, sellerId);
+        const { gigId, sellerId } = c.req.param()
+        await gigHndlr.removeGig.bind(gigHndlr)(gigId, sellerId)
 
         return c.json(
             {
                 message: "Gig deleted successfully."
             },
             StatusCodes.OK
-        );
-    });
+        )
+    })
 
     api.put("/seed/:count", (c: Context) => {
-        const count = c.req.param("count");
-        gigHndlr.populateGigs.bind(gigHndlr)(parseInt(count, 10));
+        const count = c.req.param("count")
+        gigHndlr.populateGigs.bind(gigHndlr)(parseInt(count, 10))
 
         return c.json(
             {
@@ -203,17 +245,17 @@ function gigRoute(
                 total: count
             },
             StatusCodes.CREATED
-        );
-    });
+        )
+    })
 }
 
 async function verifyGatewayRequest(c: Context, next: Next): Promise<void> {
-    const token = c.req.header("gatewayToken");
+    const token = c.req.header("gatewayToken")
     if (!token) {
         throw new NotAuthorizedError(
             "Invalid request",
             "verifyGatewayRequest() method: Request not coming from api gateway"
-        );
+        )
     }
 
     try {
@@ -221,16 +263,26 @@ async function verifyGatewayRequest(c: Context, next: Next): Promise<void> {
             token,
             GATEWAY_JWT_TOKEN!
         ) as {
-            id: string;
-            iat: number;
-        };
+            id: string
+            iat: number
+        }
 
-        c.set("gatewayToken", payload);
-        await next();
+        c.set("gatewayToken", payload)
+        await next()
     } catch (error) {
-        throw new NotAuthorizedError(
-            "Invalid request",
-            "verifyGatewayRequest() method: Request not coming from api gateway"
-        );
+        c.text("User cannot access the resource.", StatusCodes.FORBIDDEN)
+        return
     }
+}
+
+async function authOnly(c: Context, next: Next): Promise<void> {
+    const currUser = c.get("currentUser")
+    if (currUser && Object.keys(currUser).length > 0) {
+        return await next()
+    }
+
+    throw new NotAuthorizedError(
+        "User is not authenticated. Please signin first.",
+        "routes.ts - authOnly() method"
+    )
 }

@@ -1,9 +1,11 @@
-import { Config } from "@jest/types";
+import { Config } from "@jest/types"
 
 const config: Config.InitialOptions = {
     preset: "ts-jest",
     testEnvironment: "node",
     verbose: true,
+    silent: true,
+    noStackTrace: true,
     coverageDirectory: "coverage",
     collectCoverage: true,
     testPathIgnorePatterns: ["/node_modules"],
@@ -25,9 +27,7 @@ const config: Config.InitialOptions = {
     coverageReporters: ["text-summary", "lcov"],
     moduleNameMapper: {
         "@gig/(.*)": ["<rootDir>/src/$1"]
-    },
-    // silent: true,
-    // noStackTrace: true,
-};
+    }
+}
 
-export default config;
+export default config

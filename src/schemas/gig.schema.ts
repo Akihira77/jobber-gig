@@ -1,4 +1,4 @@
-import Joi, { ObjectSchema } from "joi";
+import Joi, { ObjectSchema } from "joi"
 
 export const gigCreateSchema: ObjectSchema = Joi.object().keys({
     sellerId: Joi.string().required().messages({
@@ -68,7 +68,7 @@ export const gigCreateSchema: ObjectSchema = Joi.object().keys({
         "any.required": "Gig basic description is required",
         "array.min": "Please add a basic description"
     })
-});
+})
 
 export const gigUpdateSchema: ObjectSchema = Joi.object().keys({
     title: Joi.string().required().messages({
@@ -128,4 +128,4 @@ export const gigUpdateSchema: ObjectSchema = Joi.object().keys({
         "any.required": "Gig basic description is required",
         "array.min": "Please add a basic description"
     })
-});
+})

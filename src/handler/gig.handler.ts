@@ -6,47 +6,47 @@ import {
     IPaginateProps,
     isDataURL,
     IAuthPayload
-} from "@Akihira77/jobber-shared";
-import { exchangeNamesAndRoutingKeys } from "@gig/config";
-import { ElasticSearchClient } from "@gig/elasticsearch";
-import { GigQueue } from "@gig/queues/gig.queue";
-import { GigRedis } from "@gig/redis/gig.redis";
-import { gigCreateSchema, gigUpdateSchema } from "@gig/schemas/gig.schema";
-import { GigService } from "@gig/services/gig.service";
-import { UploadApiResponse } from "cloudinary";
-import { sortBy } from "lodash";
-import { Logger } from "winston";
+} from "@Akihira77/jobber-shared"
+import { exchangeNamesAndRoutingKeys } from "@gig/config"
+import { ElasticSearchClient } from "@gig/elasticsearch"
+import { GigQueue } from "@gig/queues/gig.queue"
+import { GigRedis } from "@gig/redis/gig.redis"
+import { gigCreateSchema, gigUpdateSchema } from "@gig/schemas/gig.schema"
+import { GigService } from "@gig/services/gig.service"
+import { UploadApiResponse } from "cloudinary"
+import { sortBy } from "lodash"
+import { Logger } from "winston"
 
 export class GigHandler {
-    private redisClient: GigRedis;
+    private redisClient: GigRedis
     constructor(
         private gigService: GigService,
         private elastic: ElasticSearchClient,
         private queue: GigQueue,
         logger: (moduleName: string) => Logger
     ) {
-        this.redisClient = new GigRedis(logger);
+        this.redisClient = new GigRedis(logger)
     }
 
     async addGig(reqBody: any, currUser: IAuthPayload): Promise<ISellerGig> {
-        const { error, value } = gigCreateSchema.validate(reqBody);
+        const { error, value } = gigCreateSchema.validate(reqBody)
 
         if (error?.details) {
             throw new BadRequestError(
                 error.details[0].message,
                 "Create gig() method"
-            );
+            )
         }
 
-        const result = (await uploads(value.coverImage)) as UploadApiResponse;
+        const result = (await uploads(value.coverImage)) as UploadApiResponse
 
         if (!result?.public_id) {
             throw new BadRequestError(
                 "File upload error. Try again.",
                 "Create gig() method"
-            );
+            )
         }
-        const documentCount = await this.elastic.getDocumentCount("gigs");
+        const documentCount = await this.elastic.getDocumentCount("gigs")
 
         const gigData: ISellerGig = {
             sellerId: value.sellerId,
@@ -64,36 +64,36 @@ export class GigHandler {
             basicDescription: value.basicDescription,
             coverImage: `${result?.secure_url}`,
             sortId: documentCount + 1
-        };
+        }
 
-        const createdGig = await this.gigService.createGig(gigData);
+        const createdGig = await this.gigService.createGig(gigData)
 
-        return createdGig;
+        return createdGig
     }
 
     async removeGig(gigId: string, sellerId: string): Promise<void> {
-        await this.gigService.deleteGig(gigId, sellerId);
+        await this.gigService.deleteGig(gigId, sellerId)
 
-        return;
+        return
     }
 
     async getGigById(gigId: string): Promise<ISellerGig> {
-        const gig = await this.gigService.getGigByIdElasticDb(gigId);
+        const gig = await this.gigService.getGigByIdElasticDb(gigId)
 
-        return gig;
+        return gig
     }
 
     async getSellerActiveGigs(sellerId: string): Promise<ISellerGig[]> {
-        const gigs = await this.gigService.getSellerActiveGigsMongoDb(sellerId);
+        const gigs = await this.gigService.getSellerActiveGigsMongoDb(sellerId)
 
-        return gigs;
+        return gigs
     }
 
     async getSellerInactiveGigs(sellerId: string): Promise<ISellerGig[]> {
         const gigs =
-            await this.gigService.getSellerInactiveGigsMongoDb(sellerId);
+            await this.gigService.getSellerInactiveGigsMongoDb(sellerId)
 
-        return gigs;
+        return gigs
     }
 
     async getTopRatedGigsByCategory(
@@ -101,18 +101,23 @@ export class GigHandler {
     ): Promise<{ resultHits: ISellerGig[]; total: number }> {
         const category = await this.redisClient.getUserSelectedGigCategory(
             `selectedCategories:${username}`
-        );
-        const resultHits: ISellerGig[] = [];
+        )
+
+        if (category === "") {
+            return { resultHits: [], total: 0 }
+        }
+
+        const resultHits: ISellerGig[] = []
         const gigs: ISearchResult =
             await this.gigService.getTopRatedGigsByCategoryElasticDb(
                 `${category}`
-            );
+            )
 
         for (const item of gigs.hits) {
-            resultHits.push(item._source as ISellerGig);
+            resultHits.push(item._source as ISellerGig)
         }
 
-        return { resultHits, total: gigs.total };
+        return { resultHits, total: gigs.total }
     }
 
     async getGigsByCategory(
@@ -120,30 +125,35 @@ export class GigHandler {
     ): Promise<{ resultHits: ISellerGig[]; total: number }> {
         const category = await this.redisClient.getUserSelectedGigCategory(
             `selectedCategories:${username}`
-        );
-        const resultHits: ISellerGig[] = [];
-        const gigs: ISearchResult =
-            await this.gigService.gigsSearchByCategoryElasticDb(`${category}`);
+        )
 
-        for (const item of gigs.hits) {
-            resultHits.push(item._source as ISellerGig);
+        if (category === "") {
+            return { resultHits: [], total: 0 }
         }
 
-        return { resultHits, total: gigs.total };
+        const resultHits: ISellerGig[] = []
+        const gigs: ISearchResult =
+            await this.gigService.gigsSearchByCategoryElasticDb(`${category}`)
+
+        for (const item of gigs.hits) {
+            resultHits.push(item._source as ISellerGig)
+        }
+
+        return { resultHits, total: gigs.total }
     }
 
     async getGigsMoreLikeThis(
         gigId: string
     ): Promise<{ resultHits: ISellerGig[]; total: number }> {
-        const resultHits: ISellerGig[] = [];
+        const resultHits: ISellerGig[] = []
         const gigs: ISearchResult =
-            await this.gigService.getMoreGigsLikeThisElasticDb(gigId);
+            await this.gigService.getMoreGigsLikeThisElasticDb(gigId)
 
         for (const item of gigs.hits) {
-            resultHits.push(item._source as ISellerGig);
+            resultHits.push(item._source as ISellerGig)
         }
 
-        return { resultHits, total: gigs.total };
+        return { resultHits, total: gigs.total }
     }
 
     async getGigsQuerySearch(
@@ -153,55 +163,55 @@ export class GigHandler {
         min: number,
         max: number
     ): Promise<{ resultHits: ISellerGig[]; total: number }> {
-        let resultHits: ISellerGig[] = [];
+        let resultHits: ISellerGig[] = []
         const gigs: ISearchResult = await this.gigService.gigsSearchElasticDb(
             query,
             params,
             min,
             max,
             delivery_time
-        );
+        )
 
         for (const item of gigs.hits) {
-            resultHits.push(item._source as ISellerGig);
+            resultHits.push(item._source as ISellerGig)
         }
 
         if (params.type === "backward") {
-            resultHits = sortBy(resultHits, ["sortId"]);
+            resultHits = sortBy(resultHits, ["sortId"])
         }
 
-        return { resultHits, total: gigs.total };
+        return { resultHits, total: gigs.total }
     }
 
     async updateGig(gigId: string, reqBody: any): Promise<ISellerGig | null> {
-        const { error, value } = gigUpdateSchema.validate(reqBody);
+        const { error, value } = gigUpdateSchema.validate(reqBody)
 
         if (error?.details) {
             throw new BadRequestError(
                 error.details[0].message,
                 "Update gig() method"
-            );
+            )
         }
 
         // check if base64
         // if yes then user uploading a new image
         // if no then image is not changing
-        const isNewImage = isDataURL(value.coverImage);
-        let coverImage = value.coverImage;
+        const isNewImage = isDataURL(value.coverImage)
+        let coverImage = value.coverImage
 
         if (isNewImage) {
             const result = (await uploads(
                 value.coverImage
-            )) as UploadApiResponse;
+            )) as UploadApiResponse
 
             if (!result?.public_id) {
                 throw new BadRequestError(
                     "File upload error. Try again.",
                     "Update gig() method"
-                );
+                )
             }
 
-            coverImage = result?.secure_url;
+            coverImage = result?.secure_url
         }
 
         const gigData: ISellerGig = {
@@ -215,11 +225,11 @@ export class GigHandler {
             basicTitle: value.basicTitle,
             basicDescription: value.basicDescription,
             coverImage
-        };
+        }
 
-        const updatedGig = await this.gigService.updateGig(gigId, gigData);
+        const updatedGig = await this.gigService.updateGig(gigId, gigData)
 
-        return updatedGig;
+        return updatedGig
     }
 
     async updateActiveStatusGig(
@@ -229,21 +239,21 @@ export class GigHandler {
         const updatedGig = await this.gigService.updateActiveGigProp(
             gigId,
             active
-        );
+        )
 
-        return updatedGig;
+        return updatedGig
     }
 
     async populateGigs(count: number): Promise<void> {
-        const { gigService } = exchangeNamesAndRoutingKeys;
+        const { gigService } = exchangeNamesAndRoutingKeys
 
         await this.queue.publishDirectMessage(
             gigService.getSellers.exchangeName,
             gigService.getSellers.routingKey,
             JSON.stringify({ type: "getSellers", count }),
             "Gig seed message sent to users service."
-        );
+        )
 
-        return;
+        return
     }
 }

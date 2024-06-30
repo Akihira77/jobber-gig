@@ -1,37 +1,33 @@
-import { winstonLogger } from "@Akihira77/jobber-shared";
-import { ELASTIC_SEARCH_URL } from "@gig/config";
-import { databaseConnection } from "@gig/database";
-import { GigQueue } from "@gig/queues/gig.queue";
-import { Logger } from "winston";
+import { winstonLogger } from "@Akihira77/jobber-shared"
+import { ELASTIC_SEARCH_URL } from "@gig/config"
+import { databaseConnection } from "@gig/database"
+import { GigQueue } from "@gig/queues/gig.queue"
+import { Logger } from "winston"
 
-import { GigService } from "../gig.service";
+import { GigService } from "../gig.service"
 
 const logger = (moduleName?: string): Logger =>
-    winstonLogger(
-        `${ELASTIC_SEARCH_URL}`,
-        moduleName ?? "Gig Service",
-        "debug"
-    );
+    winstonLogger(`${ELASTIC_SEARCH_URL}`, moduleName ?? "Gig Service", "debug")
 
-let gigService: GigService;
-let db: any;
+let gigService: GigService
+let db: any
 
 // let gigId = "664d6353cf0fec9ffb355e33";
 beforeAll(async () => {
-    db = await databaseConnection(logger);
-    const queue = new GigQueue(null, logger);
-    gigService = new GigService(queue, logger);
+    db = await databaseConnection()
+    const queue = new GigQueue(null, logger)
+    gigService = new GigService(queue, logger)
     // const { hits } =
     //     await gigService.gigsSearchByCategoryElasticDb("Video & Animation");
     // if (hits.length > 0 && hits[0]._source) {
     //     const gig = hits[0]._source as any;
     //     gigId = gig["id"];
     // }
-});
+})
 
 afterAll(async () => {
-    await db.connection.close();
-});
+    await db.connection.close()
+})
 
 // describe("gig.service.ts - updateGig() method", () => {
 //     afterAll(async () => {
@@ -142,51 +138,51 @@ afterAll(async () => {
 // });
 
 describe("upsertGigReview() method", () => {
-    const gigId = "664d6353cf0fec9ffb355e33";
+    const gigId = "664d6353cf0fec9ffb355e33"
     it("Should success updating gig's review - upsertGigReview() method", async () => {
-        const gigBeforeUpdateMongo = await gigService.getGigByIdMongoDb(gigId);
+        const gigBeforeUpdateMongo = await gigService.getGigByIdMongoDb(gigId)
         const updatedGigFromMongo = await gigService.upsertGigReview({
             gigId,
             type: "buyer-review",
             rating: 5,
             sellerId: "6644215d6fdffcf6c3a6d8da"
-        });
+        })
         const updatedGigFromElastic =
-            await gigService.getGigByIdElasticDb(gigId);
+            await gigService.getGigByIdElasticDb(gigId)
 
         expect(gigBeforeUpdateMongo.ratingSum! + 5).toEqual(
             updatedGigFromMongo.ratingSum
-        );
+        )
         expect(gigBeforeUpdateMongo.ratingsCount! + 1).toEqual(
             updatedGigFromMongo.ratingsCount
-        );
+        )
         expect(gigBeforeUpdateMongo.ratingCategories?.five).toEqual({
             value: updatedGigFromMongo.ratingCategories!.five.value - 5,
             count: updatedGigFromMongo.ratingCategories!.five.count - 1
-        });
+        })
         expect(gigBeforeUpdateMongo.ratingCategories?.four).toEqual(
             updatedGigFromMongo.ratingCategories?.four
-        );
+        )
         expect(gigBeforeUpdateMongo.ratingCategories?.three).toEqual(
             updatedGigFromMongo.ratingCategories?.three
-        );
+        )
         expect(gigBeforeUpdateMongo.ratingCategories?.two).toEqual(
             updatedGigFromMongo.ratingCategories?.two
-        );
+        )
         expect(gigBeforeUpdateMongo.ratingCategories?.one).toEqual(
             updatedGigFromMongo.ratingCategories?.one
-        );
+        )
 
         expect(updatedGigFromMongo.ratingSum).toEqual(
             updatedGigFromElastic.ratingSum
-        );
+        )
         expect(updatedGigFromMongo.ratingsCount).toEqual(
             updatedGigFromElastic.ratingsCount
-        );
+        )
         expect(updatedGigFromMongo.ratingCategories).toEqual(
             updatedGigFromElastic.ratingCategories
-        );
-    });
+        )
+    })
 
     it("Should throw an error Invalid gig id - upsertGigReview() method", async () => {
         await expect(
@@ -196,6 +192,6 @@ describe("upsertGigReview() method", () => {
                 rating: 5,
                 sellerId: "6644215d6fdffcf6c3a6d8da"
             })
-        ).rejects.toThrow("Invalid gig id");
-    });
-});
+        ).rejects.toThrow("Invalid gig id")
+    })
+})
