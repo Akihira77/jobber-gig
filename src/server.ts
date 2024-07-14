@@ -1,4 +1,4 @@
-import jwt from "jsonwebtoken"
+import { createVerifier } from "fast-jwt"
 import {
     CustomError,
     IAuthPayload,
@@ -8,12 +8,9 @@ import {
     API_GATEWAY_URL,
     ELASTIC_SEARCH_URL,
     JWT_TOKEN,
+    NODE_ENV,
     PORT
 } from "@gig/config"
-import { ElasticSearchClient } from "@gig/elasticsearch"
-import { appRoutes } from "@gig/routes"
-import { Channel } from "amqplib"
-import { Logger } from "winston"
 import { Context, Hono, Next } from "hono"
 import { cors } from "hono/cors"
 import { compress } from "hono/compress"
@@ -23,24 +20,31 @@ import { secureHeaders } from "hono/secure-headers"
 import { bodyLimit } from "hono/body-limit"
 import { rateLimiter } from "hono-rate-limiter"
 import { HTTPException } from "hono/http-exception"
+import { appRoutes } from "@gig/routes"
+import { Logger } from "winston"
 import { StatusCodes } from "http-status-codes"
 import { StatusCode } from "hono/utils/http-status"
 import { serve } from "@hono/node-server"
 import { logger } from "hono/logger"
 import { GigQueue } from "./queues/gig.queue"
+import { ElasticSearchClient } from "./elasticsearch"
 
-export let gigChannel: Channel
-const LIMIT_TIMEOUT = 2 * 1000 // 2s
+const LIMIT_TIMEOUT = 3 * 1000 // 3s
 
-export async function setupHono(app: Hono): Promise<Hono> {
-    const logger = (moduleName: string) =>
-        winstonLogger(
-            `${ELASTIC_SEARCH_URL}`,
-            moduleName ?? "server.ts",
-            "debug"
-        )
-    const queue = await startQueues(logger)
+export async function setupHono(
+    app: Hono,
+    logger?: (location?: string) => Logger
+): Promise<Hono> {
+    if (!logger) {
+        logger = (location?: string) =>
+            winstonLogger(
+                `${ELASTIC_SEARCH_URL}`,
+                location ?? "server.ts",
+                "debug"
+            )
+    }
     const elastic = await startElasticSearch(logger)
+    const queue = await startQueues(elastic, logger)
     gigErrorHandler(app)
     securityMiddleware(app)
     standardMiddleware(app)
@@ -51,9 +55,9 @@ export async function setupHono(app: Hono): Promise<Hono> {
 
 export async function start(
     app: Hono,
-    logger: (moduleName: string) => Logger
+    logger: (moduleName?: string) => Logger
 ): Promise<void> {
-    app = await setupHono(app)
+    app = await setupHono(app, logger)
     startServer(app, logger)
 }
 
@@ -65,8 +69,12 @@ function securityMiddleware(app: Hono): void {
             })
         })
     )
-    app.use(secureHeaders())
-    app.use(csrf())
+    app.use(
+        secureHeaders({
+            xXssProtection: "1"
+        })
+    )
+    app.use(csrf({ origin: [`${API_GATEWAY_URL}`] }))
     app.use(
         cors({
             origin: [`${API_GATEWAY_URL}`],
@@ -78,8 +86,13 @@ function securityMiddleware(app: Hono): void {
     app.use(async (c: Context, next: Next) => {
         const authorization = c.req.header("authorization")
         if (authorization && authorization !== "") {
-            const token = authorization.split(" ")[1]
-            const payload = jwt.verify(token, JWT_TOKEN!) as IAuthPayload
+            const authBearer = authorization.split(" ")[1]
+            const verifier = createVerifier({
+                key: `${JWT_TOKEN}`,
+                cache: true,
+                cacheTTL: 30 * 60 * 1000
+            })
+            const payload = verifier(authBearer) as IAuthPayload
             c.set("currentUser", payload)
         }
 
@@ -88,7 +101,9 @@ function securityMiddleware(app: Hono): void {
 }
 
 function standardMiddleware(app: Hono): void {
-    app.use(logger())
+    if (NODE_ENV !== "production") {
+        app.use(logger())
+    }
     app.use(compress())
     app.use(
         bodyLimit({
@@ -129,13 +144,13 @@ function routesMiddleware(
 }
 
 async function startQueues(
-    logger: (moduleName: string) => Logger
+    elastic: ElasticSearchClient,
+    logger: (moduleName?: string) => Logger
 ): Promise<GigQueue> {
-    const queue = new GigQueue(null, logger)
+    const queue = new GigQueue(null, elastic, logger)
     await queue.createConnection()
     queue.consumeGigDirectMessages()
     queue.consumeSeedDirectMessages()
-
     return queue
 }
 
@@ -151,11 +166,12 @@ export async function startElasticSearch(
 
 function gigErrorHandler(app: Hono): void {
     app.notFound((c) => {
-        return c.text("Route path is not found", StatusCodes.NOT_FOUND)
+        return c.text("Route path does not found", StatusCodes.NOT_FOUND)
     })
 
     app.onError((err: Error, c: Context) => {
         if (err instanceof CustomError) {
+            console.log(err)
             return c.json(
                 err.serializeErrors(),
                 (err.statusCode as StatusCode) ??
@@ -172,13 +188,12 @@ function gigErrorHandler(app: Hono): void {
     })
 }
 
-function startServer(app: Hono, logger: (moduleName: string) => Logger): void {
+function startServer(hono: Hono, logger: (moduleName: string) => Logger): void {
     try {
         logger("server.ts - startServer()").info(
             `GigService has started with pid ${process.pid}`
         )
-
-        serve({ fetch: app.fetch, port: Number(PORT) }, (info) => {
+        serve({ fetch: hono.fetch, port: Number(PORT) }, (info) => {
             logger("server.ts - startServer()").info(
                 `GigService running on port ${info.port}`
             )

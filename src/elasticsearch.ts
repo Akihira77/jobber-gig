@@ -1,4 +1,4 @@
-import { Client } from "@elastic/elasticsearch"
+import { Client, HttpConnection } from "@elastic/elasticsearch"
 import { ISellerGig } from "@Akihira77/jobber-shared"
 import { ClusterHealthResponse } from "@elastic/elasticsearch/lib/api/types"
 import { ELASTIC_SEARCH_URL } from "@gig/config"
@@ -9,7 +9,8 @@ export class ElasticSearchClient {
     private client: Client
     constructor(private logger: (moduleName: string) => Logger) {
         this.client = new Client({
-            node: `${ELASTIC_SEARCH_URL}`
+            node: `${ELASTIC_SEARCH_URL}`,
+            Connection: HttpConnection
         })
     }
 
@@ -41,8 +42,16 @@ export class ElasticSearchClient {
         this.closeConnection(this.client)
     }
 
-    async runQuery(query: any): Promise<SearchResponse> {
-        return await this.client.search(query)
+    runQuery(query: any): Promise<SearchResponse> {
+        try {
+            return this.client.search(query)
+        } catch (error) {
+            this.logger("elasticsearch.ts - checkConnection()").error(
+                "GigService checkConnection() method error:",
+                error
+            )
+            throw new Error("elasticsearch.ts - runQuery() method error")
+        }
     }
 
     async checkExistingIndex(indexName: string): Promise<boolean> {
@@ -153,8 +162,8 @@ export class ElasticSearchClient {
     }
 
     closeConnection(client: Client): void {
-        process.once("exit", async () => {
-            await client.close()
+        process.once("exit", () => {
+            client.close()
         })
     }
 }

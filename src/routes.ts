@@ -1,7 +1,7 @@
 import { Logger } from "winston"
 import { Context, Hono, Next } from "hono"
 import { NotAuthorizedError, type IAuthPayload } from "@Akihira77/jobber-shared"
-import jwt from "jsonwebtoken"
+import { createVerifier } from "fast-jwt"
 import { StatusCodes } from "http-status-codes"
 
 import { GigQueue } from "./queues/gig.queue"
@@ -22,15 +22,15 @@ export function appRoutes(
         return c.text("Gig service is healthy and OK.", StatusCodes.OK)
     })
 
-    const gigSvc = new GigService(queue, logger)
+    const gigSvc = new GigService(queue, elastic, logger)
     const gigController = new GigHandler(gigSvc, elastic, queue, logger)
 
     const api = app.basePath(BASE_PATH)
-    // api.use(verifyGatewayRequest, authOnly);
+    api.use(verifyGatewayRequest, authOnly)
 
-    api.use(authOnly)
+    // api.use(authOnly)
     gigRoute(api, gigController)
-    api.use(verifyGatewayRequest)
+    // api.use(verifyGatewayRequest)
 }
 
 function gigRoute(
@@ -120,7 +120,7 @@ function gigRoute(
             {
                 message: "Search top gigs results",
                 total: gigs.total,
-                gigs
+                gigs: gigs.resultHits
             },
             StatusCodes.OK
         )
@@ -133,7 +133,7 @@ function gigRoute(
             {
                 message: "Search gigs more like this results",
                 total: gigs.total,
-                gigs
+                gigs: gigs.resultHits
             },
             StatusCodes.OK
         )
@@ -225,7 +225,7 @@ function gigRoute(
     })
     api.delete("/:gigId/:sellerId", async (c: Context) => {
         const { gigId, sellerId } = c.req.param()
-        await gigHndlr.removeGig.bind(gigHndlr)(gigId, sellerId)
+        gigHndlr.removeGig.bind(gigHndlr)(gigId, sellerId)
 
         return c.json(
             {
@@ -259,14 +259,13 @@ async function verifyGatewayRequest(c: Context, next: Next): Promise<void> {
     }
 
     try {
-        const payload: { id: string; iat: number } = jwt.verify(
-            token,
-            GATEWAY_JWT_TOKEN!
-        ) as {
-            id: string
-            iat: number
-        }
-
+        const verifier = createVerifier({
+            key: `${GATEWAY_JWT_TOKEN}`,
+            cache: true,
+            cacheTTL: 24 * 60 * 60 * 1000, // 24 hours,
+            maxAge: 24 * 60 * 60 * 1000
+        })
+        const payload: { id: string; iat: number } = verifier(token)
         c.set("gatewayToken", payload)
         await next()
     } catch (error) {

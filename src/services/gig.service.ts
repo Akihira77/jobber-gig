@@ -23,18 +23,14 @@ import { ElasticSearchClient } from "@gig/elasticsearch"
 import { GigQueue } from "@gig/queues/gig.queue"
 
 export class GigService {
-    private elastic: ElasticSearchClient
     constructor(
         private queue: GigQueue,
+        private elastic: ElasticSearchClient,
         private logger: (moduleName: string) => Logger
-    ) {
-        this.elastic = new ElasticSearchClient(logger)
-    }
+    ) {}
 
-    async getGigByIdElasticDb(id: string): Promise<ISellerGig> {
-        const gig = await this.elastic.getIndexedData("gigs", id)
-
-        return gig
+    getGigByIdElasticDb(id: string): Promise<ISellerGig> {
+        return this.elastic.getIndexedData("gigs", id)
     }
 
     async getGigByIdMongoDb(id: string): Promise<ISellerGig> {
@@ -364,54 +360,54 @@ export class GigService {
         max: number,
         deliveryTime?: string
     ): Promise<ISearchResult> {
-        const { from, size, type } = paginate
-        // try it on elasticsearch dev tools
-        const queryList: IQueryList[] = [
-            {
-                query_string: {
-                    fields: [
-                        "username",
-                        "title",
-                        "description",
-                        "basicDescription",
-                        "basicTitle",
-                        "categories",
-                        "subCategories",
-                        "tags"
-                    ],
-                    query: `*${searchQuery}*`
-                }
-            },
-            {
-                term: {
-                    active: true
-                }
-            }
-        ]
-
-        if (deliveryTime && deliveryTime !== "undefined") {
-            queryList.push({
-                range: {
-                    expectedDelivery: {
-                        gte: "0 Days Delivery",
-                        lte: deliveryTime
-                    }
-                }
-            } as any)
-        }
-
-        if (!isNaN(min) && !isNaN(max)) {
-            queryList.push({
-                range: {
-                    price: {
-                        gte: min,
-                        lte: max
-                    }
-                }
-            })
-        }
-
         try {
+            const { from, size, type } = paginate
+            // try it on elasticsearch dev tools
+            const queryList: IQueryList[] = [
+                {
+                    query_string: {
+                        fields: [
+                            "username",
+                            "title",
+                            "description",
+                            "basicDescription",
+                            "basicTitle",
+                            "categories",
+                            "subCategories",
+                            "tags"
+                        ],
+                        query: `*${searchQuery}*`
+                    }
+                },
+                {
+                    term: {
+                        active: true
+                    }
+                }
+            ]
+
+            if (deliveryTime && deliveryTime !== "undefined") {
+                queryList.push({
+                    range: {
+                        expectedDelivery: {
+                            gte: "0 Days Delivery",
+                            lte: deliveryTime
+                        }
+                    }
+                } as any)
+            }
+
+            if (!(isNaN(min) || isNaN(max))) {
+                queryList.push({
+                    range: {
+                        price: {
+                            gte: min,
+                            lte: max
+                        }
+                    }
+                })
+            }
+
             const result: SearchResponse = await this.elastic.runQuery({
                 index: "gigs",
                 size,
@@ -430,9 +426,8 @@ export class GigService {
             })
 
             const total: IHitsTotal = result.hits.total as IHitsTotal
-            const hits = result.hits.hits
 
-            return { total: total.value, hits }
+            return { total: total.value, hits: result.hits.hits }
         } catch (error) {
             this.logger("services/gig.service.ts - gigsSearch()").error(
                 "GigService gigsSearch() method error:",

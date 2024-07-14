@@ -5,6 +5,7 @@ import { GigQueue } from "@gig/queues/gig.queue"
 import { Logger } from "winston"
 
 import { GigService } from "../gig.service"
+import { ElasticSearchClient } from "../../elasticsearch"
 
 const logger = (moduleName?: string): Logger =>
     winstonLogger(`${ELASTIC_SEARCH_URL}`, moduleName ?? "Gig Service", "debug")
@@ -15,8 +16,9 @@ let db: any
 // let gigId = "664d6353cf0fec9ffb355e33";
 beforeAll(async () => {
     db = await databaseConnection()
-    const queue = new GigQueue(null, logger)
-    gigService = new GigService(queue, logger)
+    const elastic = new ElasticSearchClient(logger)
+    const queue = new GigQueue(null, elastic, logger)
+    gigService = new GigService(queue, elastic, logger)
     // const { hits } =
     //     await gigService.gigsSearchByCategoryElasticDb("Video & Animation");
     // if (hits.length > 0 && hits[0]._source) {

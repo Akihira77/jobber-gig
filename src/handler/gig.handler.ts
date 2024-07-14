@@ -71,22 +71,16 @@ export class GigHandler {
         return createdGig
     }
 
-    async removeGig(gigId: string, sellerId: string): Promise<void> {
-        await this.gigService.deleteGig(gigId, sellerId)
-
-        return
+    removeGig(gigId: string, sellerId: string): void {
+        this.gigService.deleteGig(gigId, sellerId)
     }
 
-    async getGigById(gigId: string): Promise<ISellerGig> {
-        const gig = await this.gigService.getGigByIdElasticDb(gigId)
-
-        return gig
+    getGigById(gigId: string): Promise<ISellerGig> {
+        return this.gigService.getGigByIdMongoDb(gigId)
     }
 
-    async getSellerActiveGigs(sellerId: string): Promise<ISellerGig[]> {
-        const gigs = await this.gigService.getSellerActiveGigsMongoDb(sellerId)
-
-        return gigs
+    getSellerActiveGigs(sellerId: string): Promise<ISellerGig[]> {
+        return this.gigService.getSellerActiveGigsMongoDb(sellerId)
     }
 
     async getSellerInactiveGigs(sellerId: string): Promise<ISellerGig[]> {

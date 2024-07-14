@@ -2,14 +2,16 @@ import { exchangeNamesAndRoutingKeys, RABBITMQ_ENDPOINT } from "@gig/config"
 import { GigService } from "@gig/services/gig.service"
 import client, { Connection, Channel, ConsumeMessage } from "amqplib"
 import { Logger } from "winston"
+import { ElasticSearchClient } from "../elasticsearch"
 
 export class GigQueue {
     private gigService: GigService
     constructor(
         private ch: Channel | null,
-        private logger: (moduleName: string) => Logger
+        elastic: ElasticSearchClient,
+        private logger: (moduleName?: string) => Logger
     ) {
-        this.gigService = new GigService(this, logger)
+        this.gigService = new GigService(this, elastic, logger)
     }
 
     async createConnection(): Promise<Channel> {
