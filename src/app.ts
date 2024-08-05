@@ -55,7 +55,7 @@ const main = async (): Promise<void> => {
 }
 
 if (NODE_ENV === "production") {
-    let numCPUs = Math.floor(os.availableParallelism() / 4)
+    let numCPUs = Math.floor(os.availableParallelism() / 2)
     numCPUs = 2
 
     if (cluster.isPrimary) {

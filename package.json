@@ -6,7 +6,7 @@
     "scripts": {
         "start:dev": "NODE_ENV=development&&nodemon -r tsconfig-paths/register src/app.ts | pino-pretty -c",
         "start:prod": "NODE_ENV=production&&pm2 start ./build/src/app.js -i 1 --name Gig_Service --trace | pino-pretty -c",
-        "start": "NODE_ENV=production node --trace-warnings build/src/app.js -gig",
+        "start":"NODE_ENV=production node build/src/app.js -gig",
         "start:pm": "NODE_ENV=production&&pm2 start ./build/src/app.js -i max --name Gig_Service --trace | pino-pretty -c",
         "stop": "pm2 stop all",
         "delete": "pm2 delete all",
